@@ -75,7 +75,7 @@ Accessing hash values:
 >>> i["$parrot{dead}"]
 '1'
 
-Accessing objects (see below for why we need to assign to _):
+Accessing objects (see below for why we assign to _):
 >>> i("unshift @INC, './perllib'")
 >>> i("use Car; $car = Car->new")
 >>> _ = i.Scar.set_brand("Toyota")
@@ -97,15 +97,17 @@ you cast it to an int or str, or use its representation, it will be called in
 scalar context. If you iterate over it, or call one of the strings() or ints()
 methods, it will be called in array context. If you don't use it at all, it
 will be called upon garbage collection of the object. Because CPython uses a
-reference counting system, this garbage collection is almost always immediate.
-So 'normal' Python code would not have to use this trick. In the doctesting
-framework, however, or in IPython, references are kept to previous return
-values. Our trick with _ makes sure that the returned objects are garbage
-collected immediately.
+reference counting system, this garbage collection is always immediate if you
+do not use the return value. This means that 'normal' Python code would not
+have to use this trick. In the doctesting framework, however, or in IPython,
+references are kept to previous return values. Our trick with _ makes sure that
+the returned objects are garbage collected immediately.
 
 Alternatively, we can let the methods be called as a result of the `repr` call:
 >>> i.Scar.drive(20)
 None
+
+Verify that this makes the intended change to the object:
 >>> i["$car->distance"]
 '40'
 >>> int(i.Scar.distance())
@@ -117,12 +119,18 @@ Nested structures:
 '65'
 >>> i.Sa['array'][1]
 '5'
+
+Assigning non-string iterables to a nested element will create an arrayref:
 >>> i.Sa['array'] = xrange(2,5)
 >>> i["@{ $a->{array} }"].ints()
 [2, 3, 4]
+
+Similarly, assiging a dict to a nested element will create a hashref:
 >>> i.Sa['dictionary'] = {'c': 67, 'd': 68}
 >>> int(i['$a->{dictionary}->{c}'])
 67
+>>> i['keys %{ $a->{dictionary} } '].strings()
+['c', 'd']
 
 """
 from libc.stdlib cimport malloc, free
