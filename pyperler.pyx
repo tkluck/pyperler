@@ -156,18 +156,6 @@ cdef class _PerlInterpreter:
     def eval_pv(self, code, croak_on_error):
         perl.eval_pv(code, croak_on_error)
 
-    def get_sv(self, name, flags):
-        cdef perl.SV *sv = perl.get_sv(name, flags)
-        if sv is NULL:
-            raise NameError();
-        return perl.SvIV(sv)
-
-    def set_sv(self, name, value):
-        cdef perl.SV *sv = perl.get_sv(name, 0)
-        if sv is NULL:
-            raise NameError();
-        perl.SvIV_set(sv, value)
-
 class Interpreter(object):
     def __init__(self):
         self._interpreter = _PerlInterpreter()
@@ -179,9 +167,6 @@ class Interpreter(object):
 
     def __getitem__(self, expression):
         return LazyExpression(self, expression)
-
-    def __setitem__(self, expression, value):
-        self._interpreter.set_sv(expression, value)
 
     def __getattribute__(self, name):
         initial = name[0].upper()
