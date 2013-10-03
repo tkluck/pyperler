@@ -76,6 +76,7 @@ cdef extern from "perl.h":
     int LEAVE
 
     void XPUSHs(SV* scalar_value)
+    void mXPUSHs(SV* scalar_value)
     int POPl
     char *POPp
     SV *POPs

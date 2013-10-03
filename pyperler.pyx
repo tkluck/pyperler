@@ -369,7 +369,7 @@ cdef class LazyVariable(LazyExpression):
     def __getattr__(self, name):
         if self._type == '$':
             ret = BoundMethod()
-            ret._sv = perl.get_sv(self._name, 0)
+            ret._sv = perl.SvREFCNT_inc(perl.get_sv(self._name, 0))
             ret._method = name
             return ret
         else:
@@ -491,11 +491,14 @@ cdef class BoundMethod:
 
     def __call__(self, *args, **kwds):
         ret = LazyCalledMethod()
-        ret._sv = self._sv
+        ret._sv = perl.SvREFCNT_inc(self._sv)
         ret._method = self._method
         ret._args = args
         ret._kwds = kwds
         return ret
+    
+    def __dealloc__(self):
+        perl.SvREFCNT_dec(self._sv)
 
 cdef class LazyCalledMethod:
     cdef perl.SV *_sv
@@ -517,10 +520,10 @@ cdef class LazyCalledMethod:
         perl.PUSHMARK(perl.SP)
         perl.XPUSHs(self._sv)
         for arg in self._args:
-            perl.XPUSHs(_new_sv_from_object(arg))
+            perl.mXPUSHs(_new_sv_from_object(arg))
         for k,v in self._kwds.iteritems():
-            perl.XPUSHs(_new_sv_from_object(k))
-            perl.XPUSHs(_new_sv_from_object(v))
+            perl.mXPUSHs(_new_sv_from_object(k))
+            perl.mXPUSHs(_new_sv_from_object(v))
         perl.PUTBACK
         count = perl.call_method(self._method, perl.G_ARRAY)
         perl.SPAGAIN
@@ -548,10 +551,10 @@ cdef class LazyCalledMethod:
         perl.PUSHMARK(perl.SP)
         perl.XPUSHs(self._sv)
         for arg in self._args:
-            perl.XPUSHs(_new_sv_from_object(arg))
+            perl.mXPUSHs(_new_sv_from_object(arg))
         for k,v in self._kwds.iteritems():
-            perl.XPUSHs(_new_sv_from_object(k))
-            perl.XPUSHs(_new_sv_from_object(v))
+            perl.mXPUSHs(_new_sv_from_object(k))
+            perl.mXPUSHs(_new_sv_from_object(v))
         perl.PUTBACK
         count = perl.call_method(self._method, perl.G_SCALAR)
         perl.SPAGAIN
@@ -585,16 +588,17 @@ cdef class LazyCalledMethod:
             perl.PUSHMARK(perl.SP)
             perl.XPUSHs(self._sv)
             for arg in self._args:
-                perl.XPUSHs(_new_sv_from_object(arg))
+                perl.mXPUSHs(_new_sv_from_object(arg))
             for k,v in self._kwds.iteritems():
-                perl.XPUSHs(_new_sv_from_object(k))
-                perl.XPUSHs(_new_sv_from_object(v))
+                perl.mXPUSHs(_new_sv_from_object(k))
+                perl.mXPUSHs(_new_sv_from_object(v))
             perl.PUTBACK
             perl.call_method(self._method, perl.G_SCALAR|perl.G_DISCARD)
             perl.SPAGAIN
 
             perl.FREETMPS
             perl.LEAVE
+        perl.SvREFCNT_dec(self._sv)
 
     def __add__(self, other):
         return int(self) + other
