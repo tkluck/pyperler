@@ -475,11 +475,7 @@ cdef class ScalarValue:
         ref_value = perl.SvRV(self._sv)
         if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
             array_value = <perl.AV*>ref_value
-            scalar_value = perl.av_fetch(array_value, key, True)
-            if scalar_value:
-                scalar_value[0] = _new_sv_from_object(value)
-            else:
-                raise IndexError()
+            perl.av_store(array_value, key, _new_sv_from_object(value))
         elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
             hash_value = <perl.HV*>ref_value
             perl.hv_store(hash_value, key, len(key), _new_sv_from_object(value), 0)

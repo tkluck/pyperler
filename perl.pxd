@@ -43,6 +43,7 @@ cdef extern from "perl.h":
     SV **av_fetch(AV* array_value, int key, bint lval)
     int av_len(AV* array_value)
     void av_push(AV* array_value, SV* scalar_value)
+    void av_store(AV* array_value, int key, SV* scalar_value)
     void av_clear(AV* array_value)
 
     HV *newHV()
