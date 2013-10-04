@@ -29,4 +29,9 @@ sub distance {
     return $self->{distance};
 }
 
+sub out_of_gas {
+    my $self = shift;
+    die "Out of gas!";
+}
+
 1; # satisfy require

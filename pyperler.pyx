@@ -113,6 +113,13 @@ Verify that this makes the intended change to the object:
 >>> int(i.Scar.distance())
 40
 
+Catching perl exceptions ('die'):
+>>> i.Scar.out_of_gas()
+Traceback (most recent call last):
+...
+RuntimeError: Out of gas! at perllib/Car.pm line 34.
+<BLANKLINE>
+
 Nested structures:
 >>> i("$a = { dictionary => { a => 65, b => 66 }, array => [ 4, 5, 6] }")
 >>> i.Sa['dictionary']['a']
@@ -131,6 +138,30 @@ Similarly, assiging a dict to a nested element will create a hashref:
 67
 >>> i['keys %{ $a->{dictionary} } '].strings()
 ['c', 'd']
+
+Calling subs:
+>>> i("sub do_something { for (1..10) { 2 + 2 }; return 3; }")
+>>> i.Fdo_something()
+'3'
+>>> i("sub add_two { return $_ + 2; }")
+>>> i.Fadd_two("4")
+'6'
+
+Anonymous subs:
+>>> i['sub { return 2*$_; }'](6)
+'12'
+
+In packages:
+>>> i.F['Car->new']()
+'HASH(0x...)'
+
+Passing a Perl function as a callback to python:
+>>> def long_computation(on_ready):
+...     for i in xrange(10**5): 2 + 2
+...     return on_ready()
+...
+>>> long_computation(i['sub { return 4; }'].scalar_context)
+'4'
 
 """
 from libc.stdlib cimport malloc, free
@@ -179,11 +210,16 @@ class Interpreter(object):
     def __getattribute__(self, name):
         initial = name[0].upper()
         if initial in 'SD':
-            return LazyVariable(self, '$', name[1:])
+            return LazyScalarVariable(self, name[1:])
         elif initial == 'A':
-            return LazyVariable(self, '@', name[1:])
+            return LazyArrayVariable(self, name[1:])
         elif initial in 'PH': 
-            return LazyVariable(self, '%', name[1:])
+            return LazyHashVariable(self, name[1:])
+        elif initial == 'F':
+            if len(name) > 1:
+                return LazyFunctionVariable(self, name[1:])
+            else:
+                raise NotImplementedError()
         else:
             return object.__getattribute__(self, name)
 
@@ -294,52 +330,92 @@ cdef class LazyExpression:
     def __nonzero__(left):
         pass
 
-cdef class LazyVariable(LazyExpression):
-    cdef object _type
+cdef class LazyScalarVariable(LazyExpression):
     cdef object _name
-    def __init__(self, interpreter, type, name):
-        self._type = type
+    def __init__(self, interpreter, name):
         self._name = name
-        LazyExpression.__init__(self, interpreter, type + name)
+        LazyExpression.__init__(self, interpreter, '$' + name)
+
+    def __getitem__(self, key):
+        cdef perl.SV** scalar_value
+        return _sv_new(perl.get_sv(self._name, 0))[key]
+
+    def __setitem__(self, key, value):
+        cdef perl.HV* hash_value
+        _sv_new(perl.get_sv(self._name, 0))[key] = value
+
+    def __iter__(self):
+        yield self
+
+    def __getattr__(self, name):
+        ret = BoundMethod()
+        ret._sv = perl.SvREFCNT_inc(perl.get_sv(self._name, 0))
+        ret._method = name
+        return ret
+
+cdef class LazyArrayVariable(LazyExpression):
+    cdef object _name
+    def __init__(self, interpreter, name):
+        self._name = name
+        LazyExpression.__init__(self, interpreter, '@' + name)
 
     def __getitem__(self, key):
         cdef perl.SV** scalar_value
         cdef perl.AV* array_value
-        cdef perl.HV* hash_value
-        if self._type == '$':
-            return _sv_new(perl.get_sv(self._name, 0))[key]
-        elif self._type == '@':
-            array_value = perl.get_av(self._name, 0)
-            scalar_value = perl.av_fetch(array_value, key, False)
-            return _sv_new(scalar_value[0])
-        elif self._type == '%':
-            hash_value = perl.get_hv(self._name, 0)
-            scalar_value = perl.hv_fetch(hash_value, key, len(key), False)
-            return _sv_new(scalar_value[0])
+        array_value = perl.get_av(self._name, 0)
+        scalar_value = perl.av_fetch(array_value, key, False)
+        return _sv_new(scalar_value[0])
         
     def __setitem__(self, key, value):
-        cdef perl.HV* hash_value
         cdef perl.AV* array_value
         cdef perl.SV** scalar_value
-        if self._type == '$':
-            _sv_new(perl.get_sv(self._name, 0))[key] = value
-        elif self._type in '@%':
-            if self._type == '@':
-                array_value = perl.get_av(self._name, 0)
-                scalar_value = perl.av_fetch(array_value, key, True)
-            else:
-                hash_value = perl.get_hv(self._name, 0)
-                scalar_value = perl.hv_fetch(hash_value, key, len(key), True)
-            if scalar_value:
-                scalar_value[0] = _new_sv_from_object(value)
-            else:
-                raise NameError("variable %s does not have ....")
-        else:
-            raise TypeError("variable %s cannot be indexed" % self._name)
+        array_value = perl.get_av(self._name, 0)
+        perl.av_store(array_value, key, _new_sv_from_object(value))
 
     def __iter__(self):
         cdef perl.SV** scalar_value
         cdef perl.AV* array_value
+        cdef int i
+        cdef int count
+
+        array_value = perl.get_av(self._name, 0)
+        count = perl.av_len(array_value)
+        for i in range(count+1):
+            scalar_value = perl.av_fetch(array_value, i, False)
+            yield _sv_new(scalar_value[0])
+
+    def __len__(self):
+        cdef perl.AV* array_value
+        array_value = perl.get_av(self._name, 0)
+        if array_value:
+            return perl.av_len(array_value) + 1
+        else:
+            raise RuntimeError()
+
+cdef class LazyHashVariable(LazyExpression):
+    cdef object _name
+    def __init__(self, interpreter, name):
+        self._name = name
+        LazyExpression.__init__(self, interpreter, '%' + name)
+
+    def __getitem__(self, key):
+        cdef perl.SV** scalar_value
+        cdef perl.HV* hash_value
+        hash_value = perl.get_hv(self._name, 0)
+        scalar_value = perl.hv_fetch(hash_value, key, len(key), False)
+        return _sv_new(scalar_value[0])
+        
+    def __setitem__(self, key, value):
+        cdef perl.HV* hash_value
+        cdef perl.SV** scalar_value
+        hash_value = perl.get_hv(self._name, 0)
+        scalar_value = perl.hv_fetch(hash_value, key, len(key), True)
+        if scalar_value:
+            scalar_value[0] = _new_sv_from_object(value)
+        else:
+            raise IndexError("variable %s does not have ....")
+
+    def __iter__(self):
         cdef perl.HV* hash_value
         cdef int i
         cdef int count
@@ -347,26 +423,14 @@ cdef class LazyVariable(LazyExpression):
         cdef int retlen
         cdef perl.SV *sv
 
-        if self._type == '$':
-            yield self
-        elif self._type == '@':
-            array_value = perl.get_av(self._name, 0)
-            count = perl.av_len(array_value)
-            for i in range(count+1):
-                scalar_value = perl.av_fetch(array_value, i, False)
-                yield _sv_new(scalar_value[0])
-        elif self._type == '%':
-            hash_value = perl.get_hv(self._name, 0)
-            count = perl.hv_iterinit(hash_value)
-            for i in range(count):
-                sv = perl.hv_iternextsv(hash_value, &key, &retlen)
-                yield key, _sv_new(sv)
+        hash_value = perl.get_hv(self._name, 0)
+        count = perl.hv_iterinit(hash_value)
+        for i in range(count):
+            sv = perl.hv_iternextsv(hash_value, &key, &retlen)
+            yield key, _sv_new(sv)
 
     def dict(self):
-        if self._type == '%':
-            return {key: value for key, value in self}
-        else:
-            raise TypeError("'%s' is not a hash" % self._name)
+        return {key: value for key, value in self}
 
     def keys(self):
         return self.dict().keys()
@@ -374,26 +438,18 @@ cdef class LazyVariable(LazyExpression):
     def values(self):
         return self.dict().values()
 
-    def __getattr__(self, name):
-        if self._type == '$':
-            ret = BoundMethod()
-            ret._sv = perl.SvREFCNT_inc(perl.get_sv(self._name, 0))
-            ret._method = name
-            return ret
-        else:
-            raise AttributeError()
+cdef class LazyFunctionVariable(LazyExpression):
+    cdef char* _name
+    def __init__(self, interpreter, name):
+        self._name = name
+        LazyExpression.__init__(self, interpreter, name)
 
-    def __len__(self):
-        cdef perl.AV* array_value
-        if self._type == '@':
-            array_value = perl.get_av(self._name, 0)
-            if array_value:
-                return perl.av_len(array_value) + 1
-            else:
-                raise RuntimeError()
-        else:
-            raise TypeError("'%s' has no length" % self._name)
-            
+    def __call__(self, *args, **kwds):
+        ret = LazyCalledSub()
+        ret._name = self._name
+        ret._args = args;
+        ret._kwds = kwds;
+        return ret
 
 cdef _sv_new(perl.SV *sv):
     ret = ScalarValue()
@@ -533,12 +589,17 @@ cdef class LazyCalledMethod:
             perl.mXPUSHs(_new_sv_from_object(k))
             perl.mXPUSHs(_new_sv_from_object(v))
         perl.PUTBACK
-        count = perl.call_method(self._method, perl.G_ARRAY)
-        perl.SPAGAIN
-        ret = [_sv_new(perl.POPs) for i in range(count)]
-        perl.PUTBACK
-        perl.FREETMPS
-        perl.LEAVE
+        try:
+            count = perl.call_method(self._method, perl.G_EVAL|perl.G_ARRAY)
+            if perl.SvTRUE(perl.ERRSV):
+                perl.POPs
+                raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
+        finally:
+            perl.SPAGAIN
+            ret = [_sv_new(perl.POPs) for i in range(count)]
+            perl.PUTBACK
+            perl.FREETMPS
+            perl.LEAVE
         for r in ret:
             yield r
 
@@ -564,9 +625,120 @@ cdef class LazyCalledMethod:
             perl.mXPUSHs(_new_sv_from_object(k))
             perl.mXPUSHs(_new_sv_from_object(v))
         perl.PUTBACK
-        count = perl.call_method(self._method, perl.G_SCALAR)
-        perl.SPAGAIN
         try:
+            count = perl.call_method(self._method, perl.G_EVAL|perl.G_SCALAR)
+            perl.SPAGAIN
+            if perl.SvTRUE(perl.ERRSV):
+                perl.POPs
+                raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
+            if count == 1:
+                ret_sv = perl.POPs
+                if ret_sv:
+                    return _sv_new(ret_sv)
+                else:
+                    raise RuntimeError()
+            else:
+                raise RuntimeError()
+        finally:
+            perl.PUTBACK
+            perl.FREETMPS
+            perl.LEAVE
+
+    def __str__(self):
+        return str(self._scalar_value())
+
+    def __repr__(self):
+        return repr(self._scalar_value())
+
+    def __dealloc__(self):
+        if not self._evaluated:
+            perl.dSP
+            perl.ENTER
+            perl.SAVETMPS 
+
+            perl.PUSHMARK(perl.SP)
+            perl.XPUSHs(self._sv)
+            for arg in self._args:
+                perl.mXPUSHs(_new_sv_from_object(arg))
+            for k,v in self._kwds.iteritems():
+                perl.mXPUSHs(_new_sv_from_object(k))
+                perl.mXPUSHs(_new_sv_from_object(v))
+            perl.PUTBACK
+            try:
+                perl.call_method(self._method, perl.G_SCALAR|perl.G_DISCARD)
+                if perl.SvTRUE(perl.ERRSV):
+                    raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
+            finally:
+                perl.FREETMPS
+                perl.LEAVE
+        perl.SvREFCNT_dec(self._sv)
+
+    def __add__(self, other):
+        return int(self) + other
+
+cdef class LazyCalledSub:
+    cdef char *_name
+    cdef object _args
+    cdef object _kwds
+    cdef bint _evaluated
+
+    def __iter__(self):
+        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
+        self._evaluated = True
+
+        cdef int count
+        cdef int i
+        perl.dSP
+        perl.ENTER
+        perl.SAVETMPS 
+
+        perl.PUSHMARK(perl.SP)
+        for arg in self._args:
+            perl.mXPUSHs(_new_sv_from_object(arg))
+        for k,v in self._kwds.iteritems():
+            perl.mXPUSHs(_new_sv_from_object(k))
+            perl.mXPUSHs(_new_sv_from_object(v))
+        perl.PUTBACK
+        try:
+            count = perl.call_pv(self._name, perl.G_EVAL|perl.G_ARRAY)
+            perl.SPAGAIN
+            ret = [_sv_new(perl.POPs) for i in range(count)]
+            if perl.SvTRUE(perl.ERRSV):
+                raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
+            for r in ret:
+                yield r
+        finally:
+            perl.PUTBACK
+            perl.FREETMPS
+            perl.LEAVE
+
+    def __int__(self):
+        return int(self._scalar_value())
+
+    def _scalar_value(self):
+        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
+        self._evaluated = True
+
+        cdef int count
+        cdef int i
+        cdef perl.SV* ret_sv
+        perl.dSP
+        perl.ENTER
+        perl.SAVETMPS 
+
+        perl.PUSHMARK(perl.SP)
+        for arg in self._args:
+            perl.mXPUSHs(_new_sv_from_object(arg))
+        for k,v in self._kwds.iteritems():
+            perl.mXPUSHs(_new_sv_from_object(k))
+            perl.mXPUSHs(_new_sv_from_object(v))
+        perl.PUTBACK
+        try:
+            count = perl.call_pv(self._name, perl.G_EVAL|perl.G_SCALAR)
+            perl.SPAGAIN
+            if perl.SvTRUE(perl.ERRSV):
+                perl.POPs
+                raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
             if count == 1:
                 ret_sv = perl.POPs
                 if ret_sv:
@@ -594,23 +766,22 @@ cdef class LazyCalledMethod:
             perl.SAVETMPS 
 
             perl.PUSHMARK(perl.SP)
-            perl.XPUSHs(self._sv)
             for arg in self._args:
                 perl.mXPUSHs(_new_sv_from_object(arg))
             for k,v in self._kwds.iteritems():
                 perl.mXPUSHs(_new_sv_from_object(k))
                 perl.mXPUSHs(_new_sv_from_object(v))
             perl.PUTBACK
-            perl.call_method(self._method, perl.G_SCALAR|perl.G_DISCARD)
-            perl.SPAGAIN
-
-            perl.FREETMPS
-            perl.LEAVE
-        perl.SvREFCNT_dec(self._sv)
+            try:
+                perl.call_pv(self._name, perl.G_SCALAR|perl.G_DISCARD)
+                perl.SPAGAIN
+                if perl.SvTRUE(perl.ERRSV):
+                    raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
+            finally:
+                perl.FREETMPS
+                perl.LEAVE
 
     def __add__(self, other):
         return int(self) + other
-
-
 import sys,os
 PERL_SYS_INIT3(sys.argv, os.environ)

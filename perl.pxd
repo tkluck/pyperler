@@ -26,6 +26,7 @@ cdef extern from "perl.h":
     SV *eval_pv(char *code, bint croak_on_error)
     int eval_sv(SV *scalar_value, int flags)
     int call_method(char *method_name, int flags)
+    int call_pv(char *name, int flags)
 
     SV *newSVpvn_utf8(char *value, int length, bint utf8)
     SV *newSViv(int value)
@@ -62,6 +63,7 @@ cdef extern from "perl.h":
     int G_SCALAR
     int G_ARRAY
     int G_DISCARD
+    int G_EVAL
 
     int GV_ADD
 
@@ -93,3 +95,6 @@ cdef extern from "perl.h":
     SV* SvREFCNT_dec(SV *scalar_value)
 
     bint SvOK(SV *scalar_value)
+
+    bint SvTRUE(SV *scalar_value)
+    SV *ERRSV
