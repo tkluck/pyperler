@@ -27,6 +27,7 @@ cdef extern from "perl.h":
     int eval_sv(SV *scalar_value, int flags)
     int call_method(char *method_name, int flags)
     int call_pv(char *name, int flags)
+    int call_sv(SV* scalar_value, int flags)
 
     SV *newSVpvn_utf8(char *value, int length, bint utf8)
     SV *newSViv(int value)

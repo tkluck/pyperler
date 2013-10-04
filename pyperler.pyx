@@ -143,12 +143,12 @@ Calling subs:
 >>> i("sub do_something { for (1..10) { 2 + 2 }; return 3; }")
 >>> i.Fdo_something()
 '3'
->>> i("sub add_two { return $_ + 2; }")
+>>> i("sub add_two { return $_[0] + 2; }")
 >>> i.Fadd_two("4")
 '6'
 
 Anonymous subs:
->>> i['sub { return 2*$_; }'](6)
+>>> i['sub { return 2*$_[0]; }'](6)
 '12'
 
 In packages:
@@ -256,6 +256,9 @@ cdef class LazyExpression:
     cdef perl.SV* _expression_sv(self):
         return perl.newSVpvn_utf8(self._expression, len(self._expression), True)
         
+    def __call__(self, *args, **kwds):
+        return self._result_sv()(*args, **kwds)
+
     def strings(self):
         if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
         self._evaluated = True
@@ -323,6 +326,19 @@ cdef class LazyExpression:
             return "'" + perl.SvPVutf8_nolen(sv) + "'"
         else:
             return "None"
+
+    def _result_sv(self):
+        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
+        self._evaluated = True
+
+        perl.dSP
+        cdef int count = perl.eval_sv(self._expression_sv(), perl.G_SCALAR|perl.G_EVAL)
+        perl.SPAGAIN
+        ret = _sv_new(perl.POPs)
+        perl.PUTBACK
+        if perl.SvTRUE(perl.ERRSV):
+            raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
+        return ret
         
     def __cmp__(left, right):
         pass
@@ -438,11 +454,10 @@ cdef class LazyHashVariable(LazyExpression):
     def values(self):
         return self.dict().values()
 
-cdef class LazyFunctionVariable(LazyExpression):
-    cdef char* _name
+cdef class LazyFunctionVariable(object):
+    cdef object _name
     def __init__(self, interpreter, name):
         self._name = name
-        LazyExpression.__init__(self, interpreter, name)
 
     def __call__(self, *args, **kwds):
         ret = LazyCalledSub()
@@ -549,13 +564,20 @@ cdef class ScalarValue:
             #else:
             #    raise IndexError()
 
+    def __call__(self, *args, **kwds):
+        ret = LazyCalledSub()
+        ret._sv = perl.SvREFCNT_inc(self._sv)
+        ret._args = args
+        ret._kwds = kwds
+        return ret
+
 cdef class BoundMethod:
     cdef perl.SV *_sv
-    cdef char *_method
+    cdef object _method
 
     def __call__(self, *args, **kwds):
-        ret = LazyCalledMethod()
-        ret._sv = perl.SvREFCNT_inc(self._sv)
+        ret = LazyCalledSub()
+        ret._self = perl.SvREFCNT_inc(self._sv)
         ret._method = self._method
         ret._args = args
         ret._kwds = kwds
@@ -564,16 +586,21 @@ cdef class BoundMethod:
     def __dealloc__(self):
         perl.SvREFCNT_dec(self._sv)
 
-cdef class LazyCalledMethod:
-    cdef perl.SV *_sv
-    cdef char *_method
+cdef class LazyCalledSub:
+    cdef object _name
+    cdef object _method
+    cdef perl.SV* _sv
+
+    cdef perl.SV *_self
     cdef object _args
     cdef object _kwds
     cdef bint _evaluated
 
-    def __iter__(self):
+    def result(self, list_context):
         if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
         self._evaluated = True
+
+        cdef flag = perl.G_ARRAY if list_context else perl.G_SCALAR
 
         cdef int count
         cdef int i
@@ -582,7 +609,8 @@ cdef class LazyCalledMethod:
         perl.SAVETMPS 
 
         perl.PUSHMARK(perl.SP)
-        perl.XPUSHs(self._sv)
+        if self._self:
+            perl.XPUSHs(self._self)
         for arg in self._args:
             perl.mXPUSHs(_new_sv_from_object(arg))
         for k,v in self._kwds.iteritems():
@@ -590,196 +618,44 @@ cdef class LazyCalledMethod:
             perl.mXPUSHs(_new_sv_from_object(v))
         perl.PUTBACK
         try:
-            count = perl.call_method(self._method, perl.G_EVAL|perl.G_ARRAY)
-            if perl.SvTRUE(perl.ERRSV):
-                perl.POPs
-                raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
-        finally:
+            if self._self:
+                count = perl.call_method(self._method, perl.G_EVAL|flag)
+            elif self._name:
+                count = perl.call_pv(self._name, perl.G_EVAL|flag)
+            elif self._sv:
+                count = perl.call_sv(self._sv, perl.G_EVAL|flag)
+            else:
+                raise AssertionError()
             perl.SPAGAIN
             ret = [_sv_new(perl.POPs) for i in range(count)]
+            if perl.SvTRUE(perl.ERRSV):
+                raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
+            if list_context:
+                return ret
+            else:
+                return ret[0]
+        finally:
             perl.PUTBACK
             perl.FREETMPS
             perl.LEAVE
-        for r in ret:
+
+    def __iter__(self):
+        for r in self.result(True):
             yield r
 
     def __int__(self):
-        return int(self._scalar_value())
-
-    def _scalar_value(self):
-        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
-        self._evaluated = True
-
-        cdef int count
-        cdef int i
-        cdef perl.SV* ret_sv
-        perl.dSP
-        perl.ENTER
-        perl.SAVETMPS 
-
-        perl.PUSHMARK(perl.SP)
-        perl.XPUSHs(self._sv)
-        for arg in self._args:
-            perl.mXPUSHs(_new_sv_from_object(arg))
-        for k,v in self._kwds.iteritems():
-            perl.mXPUSHs(_new_sv_from_object(k))
-            perl.mXPUSHs(_new_sv_from_object(v))
-        perl.PUTBACK
-        try:
-            count = perl.call_method(self._method, perl.G_EVAL|perl.G_SCALAR)
-            perl.SPAGAIN
-            if perl.SvTRUE(perl.ERRSV):
-                perl.POPs
-                raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
-            if count == 1:
-                ret_sv = perl.POPs
-                if ret_sv:
-                    return _sv_new(ret_sv)
-                else:
-                    raise RuntimeError()
-            else:
-                raise RuntimeError()
-        finally:
-            perl.PUTBACK
-            perl.FREETMPS
-            perl.LEAVE
+        return int(self.result(False))
 
     def __str__(self):
-        return str(self._scalar_value())
+        return str(self.result(False))
 
     def __repr__(self):
-        return repr(self._scalar_value())
+        return repr(self.result(False))
 
     def __dealloc__(self):
         if not self._evaluated:
-            perl.dSP
-            perl.ENTER
-            perl.SAVETMPS 
-
-            perl.PUSHMARK(perl.SP)
-            perl.XPUSHs(self._sv)
-            for arg in self._args:
-                perl.mXPUSHs(_new_sv_from_object(arg))
-            for k,v in self._kwds.iteritems():
-                perl.mXPUSHs(_new_sv_from_object(k))
-                perl.mXPUSHs(_new_sv_from_object(v))
-            perl.PUTBACK
-            try:
-                perl.call_method(self._method, perl.G_SCALAR|perl.G_DISCARD)
-                if perl.SvTRUE(perl.ERRSV):
-                    raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
-            finally:
-                perl.FREETMPS
-                perl.LEAVE
-        perl.SvREFCNT_dec(self._sv)
-
-    def __add__(self, other):
-        return int(self) + other
-
-cdef class LazyCalledSub:
-    cdef char *_name
-    cdef object _args
-    cdef object _kwds
-    cdef bint _evaluated
-
-    def __iter__(self):
-        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
-        self._evaluated = True
-
-        cdef int count
-        cdef int i
-        perl.dSP
-        perl.ENTER
-        perl.SAVETMPS 
-
-        perl.PUSHMARK(perl.SP)
-        for arg in self._args:
-            perl.mXPUSHs(_new_sv_from_object(arg))
-        for k,v in self._kwds.iteritems():
-            perl.mXPUSHs(_new_sv_from_object(k))
-            perl.mXPUSHs(_new_sv_from_object(v))
-        perl.PUTBACK
-        try:
-            count = perl.call_pv(self._name, perl.G_EVAL|perl.G_ARRAY)
-            perl.SPAGAIN
-            ret = [_sv_new(perl.POPs) for i in range(count)]
-            if perl.SvTRUE(perl.ERRSV):
-                raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
-            for r in ret:
-                yield r
-        finally:
-            perl.PUTBACK
-            perl.FREETMPS
-            perl.LEAVE
-
-    def __int__(self):
-        return int(self._scalar_value())
-
-    def _scalar_value(self):
-        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
-        self._evaluated = True
-
-        cdef int count
-        cdef int i
-        cdef perl.SV* ret_sv
-        perl.dSP
-        perl.ENTER
-        perl.SAVETMPS 
-
-        perl.PUSHMARK(perl.SP)
-        for arg in self._args:
-            perl.mXPUSHs(_new_sv_from_object(arg))
-        for k,v in self._kwds.iteritems():
-            perl.mXPUSHs(_new_sv_from_object(k))
-            perl.mXPUSHs(_new_sv_from_object(v))
-        perl.PUTBACK
-        try:
-            count = perl.call_pv(self._name, perl.G_EVAL|perl.G_SCALAR)
-            perl.SPAGAIN
-            if perl.SvTRUE(perl.ERRSV):
-                perl.POPs
-                raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
-            if count == 1:
-                ret_sv = perl.POPs
-                if ret_sv:
-                    return _sv_new(ret_sv)
-                else:
-                    raise RuntimeError()
-            else:
-                raise RuntimeError()
-        finally:
-            perl.PUTBACK
-
-            perl.FREETMPS
-            perl.LEAVE
-
-    def __str__(self):
-        return str(self._scalar_value())
-
-    def __repr__(self):
-        return repr(self._scalar_value())
-
-    def __dealloc__(self):
-        if not self._evaluated:
-            perl.dSP
-            perl.ENTER
-            perl.SAVETMPS 
-
-            perl.PUSHMARK(perl.SP)
-            for arg in self._args:
-                perl.mXPUSHs(_new_sv_from_object(arg))
-            for k,v in self._kwds.iteritems():
-                perl.mXPUSHs(_new_sv_from_object(k))
-                perl.mXPUSHs(_new_sv_from_object(v))
-            perl.PUTBACK
-            try:
-                perl.call_pv(self._name, perl.G_SCALAR|perl.G_DISCARD)
-                perl.SPAGAIN
-                if perl.SvTRUE(perl.ERRSV):
-                    raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
-            finally:
-                perl.FREETMPS
-                perl.LEAVE
+            self.result(False)
+        perl.SvREFCNT_dec(self._self)
 
     def __add__(self, other):
         return int(self) + other
