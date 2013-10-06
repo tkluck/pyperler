@@ -117,7 +117,7 @@ Catching perl exceptions ('die'):
 >>> i.Scar.out_of_gas()
 Traceback (most recent call last):
 ...
-RuntimeError: Out of gas! at perllib/Car.pm line 34.
+RuntimeError: Out of gas! at perllib/Car.pm line 38.
 <BLANKLINE>
 
 Nested structures:
@@ -152,16 +152,19 @@ Anonymous subs:
 '12'
 
 In packages:
->>> i.F['Car->new']()
-'HASH(0x...)'
+>>> i.F['Car::all_brands']().strings()
+['Toyota', 'Nissan']
 
 Passing a Perl function as a callback to python:
 >>> def long_computation(on_ready):
 ...     for i in xrange(10**5): 2 + 2
-...     return on_ready()
+...     return on_ready(5)
 ...
 >>> long_computation(i['sub { return 4; }'].scalar_context)
 '4'
+>>> i('sub callback { return $_[0]; }');
+>>> long_computation(i.Fcallback.scalar_context)
+'5'
 
 """
 from libc.stdlib cimport malloc, free
@@ -219,7 +222,10 @@ class Interpreter(object):
             if len(name) > 1:
                 return LazyFunctionVariable(self, name[1:])
             else:
-                raise NotImplementedError()
+                class FunctionLookup(object):
+                    def __getitem__(self, key):
+                        return LazyFunctionVariable(self, key)
+                return FunctionLookup()
         else:
             return object.__getattribute__(self, name)
 
@@ -346,6 +352,13 @@ cdef class LazyExpression:
     def __nonzero__(left):
         pass
 
+    def scalar_context(self, *args, **kwds):
+        return self(*args, **kwds).result(False)
+
+    def list_context(self, *args, **kwds):
+        return self(*args, **kwds).result(True)
+
+
 cdef class LazyScalarVariable(LazyExpression):
     cdef object _name
     def __init__(self, interpreter, name):
@@ -465,6 +478,12 @@ cdef class LazyFunctionVariable(object):
         ret._args = args;
         ret._kwds = kwds;
         return ret
+
+    def scalar_context(self, *args, **kwds):
+        return self(*args, **kwds).result(False)
+
+    def list_context(self, *args, **kwds):
+        return self(*args, **kwds).result(True)
 
 cdef _sv_new(perl.SV *sv):
     ret = ScalarValue()
@@ -628,6 +647,7 @@ cdef class LazyCalledSub:
                 raise AssertionError()
             perl.SPAGAIN
             ret = [_sv_new(perl.POPs) for i in range(count)]
+            ret.reverse()
             if perl.SvTRUE(perl.ERRSV):
                 raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
             if list_context:
@@ -642,6 +662,12 @@ cdef class LazyCalledSub:
     def __iter__(self):
         for r in self.result(True):
             yield r
+
+    def strings(self):
+        return [str(e) for e in self]
+
+    def ints(self):
+        return [int(e) for e in self]
 
     def __int__(self):
         return int(self.result(False))

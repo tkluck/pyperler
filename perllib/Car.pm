@@ -1,5 +1,9 @@
 package Car;
 
+sub all_brands {
+    return qw / Toyota Nissan /;
+}
+
 sub new {
     my $class = shift;
     return bless({}, $class);
