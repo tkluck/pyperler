@@ -155,7 +155,9 @@ In packages:
 >>> i.F['Car::all_brands']().strings()
 ['Toyota', 'Nissan']
 
-Passing a Perl function as a callback to python:
+Passing a Perl function as a callback to python. You'll need to
+specify whether you want it to evaluate in scalar context or
+list context:
 >>> def long_computation(on_ready):
 ...     for i in xrange(10**5): 2 + 2
 ...     return on_ready(5)
@@ -166,9 +168,42 @@ Passing a Perl function as a callback to python:
 >>> long_computation(i.Fcallback.scalar_context)
 '5'
 
+You can maintain a reference to a Perl object, without it being
+a Perl variable:
+>>> car = i['Car->new'].result(False)
+>>> _ = car.set_brand('Chevrolet')
+>>> _ = car.drive(20)
+>>> del _
+>>> car.brand()
+'Chevrolet'
+>>> del car   # this deletes it on the Perl side, too
+
+>>> i('sub p { return $_[0] ** $_[1]; }')
+>>> i.Fp(2,3)
+'8'
+
+You can also pass Python functions as Perl callbacks:
+>>> def f(): return 3 
+>>> i('sub callit { return $_[0]->() }')
+>>> #i.Fcallit(f)
+'3'
+>>> def g(x): return x**2
+>>> i('sub pass_three { return $_[0]->(3) }')
+>>> #i.Fpass_three(g)
+'9'
+>>> i('sub call_first { return $_[0]->($_[1]); }')
+>>> #i.Fcall_first(eval, "2+2")
+'4'
+
+And this even works if you switch between Perl and Python several times:
+>>> #i.Fcall_first(i, "2+2")
+'4'
+
+
 """
 from libc.stdlib cimport malloc, free
 from cpython.string cimport PyString_AsString
+from cpython cimport PyObject, Py_XINCREF
 cimport perl
 
 cpdef PERL_SYS_INIT3(argv, env):
@@ -176,6 +211,52 @@ cpdef PERL_SYS_INIT3(argv, env):
     cdef char** cargv
     cdef char** cenv
     perl.PERL_SYS_INIT3(&argc, &cargv, &cenv)
+
+cdef void call_object(perl.CV* p1, perl.CV* p2):
+    perl.dSP
+    cdef int ax = perl.my_perl.Imarkstack_ptr[0]
+    cdef perl.SV **mark = &(perl.my_perl.Istack_base[ax])
+    ax += 1
+    cdef int items = perl.SP - mark
+
+    if items < 1:
+        print "problem"
+        return
+
+    perl.ENTER
+    try:
+        args = [_sv_new(perl.POPs) for _ in xrange(items-1)]
+        args.reverse()
+        obj = <object><void*>perl.SvIVX(perl.SvRV(perl.POPs))
+        perl.PUSHMARK(perl.SP)
+        perl.XPUSHs(_new_sv_from_object(obj(*args)))
+    except:
+        perl.croak(sys.exc_type.message)
+    finally:
+        perl.PUTBACK
+        perl.LEAVE
+
+cdef void dummy(perl.CV* p1, perl.CV* p2):
+    perl.dSP
+    cdef int ax = perl.my_perl.Imarkstack_ptr[0]
+    cdef perl.SV **mark = &(perl.my_perl.Istack_base[ax])
+    ax += 1
+    cdef int items = perl.SP - mark
+
+    perl.ENTER
+    for _ in xrange(items):
+        perl.POPs
+    perl.PUSHMARK(perl.SP)
+    perl.PUTBACK
+    perl.LEAVE
+
+
+cdef void xs_init():
+    cdef char *file = "file"
+    perl.newXS("Python::PyObject_CallObject", <void*>&call_object, file)
+    perl.newXS("Python::bootstrap", &dummy, file)
+    perl.newXS("Python::Object::bootstrap", &dummy, file)
+    perl.newXS("Python::PyObject_Str", &dummy, file)
 
 cdef class _PerlInterpreter:
     cdef perl.PerlInterpreter *_this
@@ -189,7 +270,7 @@ cdef class _PerlInterpreter:
         cdef char **string_buf = <char**>malloc(len(argv) * sizeof(char*))
         for i in range(len(argv)):
             string_buf[i] = PyString_AsString(argv[i])
-        perl.perl_parse(perl.my_perl, NULL, len(argv), string_buf, NULL)
+        perl.perl_parse(perl.my_perl, &xs_init, len(argv), string_buf, NULL)
         free(string_buf)
 
     def run(self):
@@ -201,7 +282,7 @@ cdef class _PerlInterpreter:
 class Interpreter(object):
     def __init__(self):
         self._interpreter = _PerlInterpreter()
-        self._interpreter.parse(["","-e","0"])
+        self._interpreter.parse(["","-I./perllib","-e","use Python::Object;"])
         self._interpreter.run()
 
     def __call__(self, code):
@@ -259,11 +340,29 @@ cdef class LazyExpression:
         self._interpreter = interpreter
         self._expression = expression
 
+    def result(self, list_context):
+        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
+        self._evaluated = True
+
+        cdef flag = perl.G_ARRAY if list_context else perl.G_SCALAR
+        perl.dSP
+        cdef int count = perl.eval_sv(self._expression_sv(), perl.G_EVAL|flag)
+        perl.SPAGAIN
+        ret = [_sv_new(perl.POPs) for _ in range(count)]
+        perl.PUTBACK
+        if perl.SvTRUE(perl.ERRSV):
+            raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
+        ret.reverse()
+        if(list_context):
+            return ret
+        else:
+            return ret[0]
+
     cdef perl.SV* _expression_sv(self):
         return perl.newSVpvn_utf8(self._expression, len(self._expression), True)
         
     def __call__(self, *args, **kwds):
-        return self._result_sv()(*args, **kwds)
+        return self.result(False)(*args, **kwds)
 
     def strings(self):
         if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
@@ -333,19 +432,6 @@ cdef class LazyExpression:
         else:
             return "None"
 
-    def _result_sv(self):
-        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
-        self._evaluated = True
-
-        perl.dSP
-        cdef int count = perl.eval_sv(self._expression_sv(), perl.G_SCALAR|perl.G_EVAL)
-        perl.SPAGAIN
-        ret = _sv_new(perl.POPs)
-        perl.PUTBACK
-        if perl.SvTRUE(perl.ERRSV):
-            raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
-        return ret
-        
     def __cmp__(left, right):
         pass
 
@@ -496,14 +582,28 @@ def iter_or_none(value):
     except TypeError:
         return None
 
+cdef int _free(perl.SV* sv, perl.MAGIC* mg):
+    return 0
+    #TODO
+    obj = <object><void*>perl.SvIVX(perl.SvRV(sv))
+    del obj
+
+cdef perl.MGVTBL virtual_table
+virtual_table.svt_free = _free
+
 cdef perl.SV *_new_sv_from_object(object value):
+    cdef perl.SV* scalar_value
+    cdef perl.SV* ref_value
+
     cdef perl.AV* array_value
     cdef perl.HV* hash_value
+    
+    cdef perl.MAGIC* magic
+
     it = iter_or_none(value)
     if isinstance(value, int):
         return perl.newSViv(value)
     elif isinstance(value, str):
-        value = (value)
         return perl.newSVpvn_utf8(value, len(value), True)
     elif isinstance(value, dict):
         hash_value = perl.newHV()
@@ -517,8 +617,17 @@ cdef perl.SV *_new_sv_from_object(object value):
             perl.av_push(array_value, _new_sv_from_object(i))
         return perl.newRV_noinc(<perl.SV*>array_value)
     else:
-        value = str(value)
-        return perl.newSVpvn_utf8(value, len(value), True)
+        ref_value = perl.newSV(0);
+        scalar_value = perl.newSVrv(ref_value, "Python::Object");
+        Py_XINCREF(<PyObject*>value)
+        perl.SvIV_set(scalar_value, <int><void*>value)
+        
+        #perl.sv_magic(scalar_value, <perl.SV*>0, <int>('~'), <char*>0, 0)
+        #magic = perl.mg_find(scalar_value, <int>('~'))
+        #magic.mg_virtual = &virtual_table
+
+        perl.SvREADONLY(scalar_value)
+        return ref_value
 
 cdef _assign_sv(perl.SV *sv, object value):
     if isinstance(value, int):
@@ -539,6 +648,9 @@ cdef class ScalarValue:
 
     def __int__(self):
         return perl.SvIV(self._sv)
+
+    def __pow__(self, e, z):
+        return int(self)**e
 
     def __repr__(self):
         if perl.SvOK(self._sv):
@@ -588,6 +700,12 @@ cdef class ScalarValue:
         ret._sv = perl.SvREFCNT_inc(self._sv)
         ret._args = args
         ret._kwds = kwds
+        return ret
+
+    def __getattr__(self, name):
+        ret = BoundMethod()
+        ret._sv = perl.SvREFCNT_inc(self._sv)
+        ret._method = name
         return ret
 
 cdef class BoundMethod:
@@ -658,6 +776,12 @@ cdef class LazyCalledSub:
             perl.PUTBACK
             perl.FREETMPS
             perl.LEAVE
+
+    def scalar_context(self, *args, **kwds):
+        return self(*args, **kwds).result(False)
+
+    def list_context(self, *args, **kwds):
+        return self(*args, **kwds).result(True)
 
     def __iter__(self):
         for r in self.result(True):

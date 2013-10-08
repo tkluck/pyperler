@@ -6,7 +6,9 @@ cdef extern from "EXTERN.h":
 
 cdef extern from "perl.h":
     ctypedef struct PerlInterpreter:
-        pass
+        int *Imarkstack_ptr
+        SV **Istack_base
+
     ctypedef void *XSINIT_t
 
     ctypedef struct SV:
@@ -18,10 +20,18 @@ cdef extern from "perl.h":
     ctypedef struct HV:
         pass
 
+    ctypedef struct CV:
+        pass
+
+    ctypedef struct RV:
+        pass
+
     PerlInterpreter *perl_alloc()
     bint perl_construct(PerlInterpreter *interpreter)
     bint perl_parse(PerlInterpreter *interpreter, XSINIT_t xsinit, int argc, char** argv, char** env)
     bint perl_run(PerlInterpreter *interpreter)
+
+    void croak(char* message)
 
     SV *eval_pv(char *code, bint croak_on_error)
     int eval_sv(SV *scalar_value, int flags)
@@ -29,17 +39,23 @@ cdef extern from "perl.h":
     int call_pv(char *name, int flags)
     int call_sv(SV* scalar_value, int flags)
 
+    SV *newSV(int len)
     SV *newSVpvn_utf8(char *value, int length, bint utf8)
     SV *newSViv(int value)
+
+    SV* newSVrv(SV* rv, char* classname)
+    SV* sv_setref_pv(SV *const rv, char* classname, void* pv)
 
     SV* get_sv(char *name, int flags)
     AV* get_av(char *name, int flags)
     HV* get_hv(char *name, int flags)
 
     int SvIV(SV* scalar_value)
+    int SvIVX(SV* scalar_value)
     bint SvIV_set(SV* scalar_value, int value)
     char *SvPVutf8_nolen(SV* scalar_value)
     void SvPV_set(SV* scalar_value, char *value)
+    void SvREADONLY(SV* scalar_value)
 
     AV *newAV()
     SV **av_fetch(AV* array_value, int key, bint lval)
@@ -72,17 +88,19 @@ cdef extern from "perl.h":
     int SPAGAIN
     int ENTER
     int SAVETMPS
-    int SP
-    int PUSHMARK(int SP)
+    SV** SP
+    int PUSHMARK(SV** SP)
     int PUTBACK
     int FREETMPS
     int LEAVE
 
+    void mXPUSHi(int value)
     void XPUSHs(SV* scalar_value)
     void mXPUSHs(SV* scalar_value)
     int POPl
     char *POPp
     SV *POPs
+    SV * ST(int number)
 
     int SvTYPE(SV *scalar_value)
     int SVt_PVAV
@@ -99,3 +117,18 @@ cdef extern from "perl.h":
 
     bint SvTRUE(SV *scalar_value)
     SV *ERRSV
+
+    ctypedef struct MGVTBL:
+        int (*svt_get)(SV* sv, MAGIC* mg)
+        int (*svt_set)(SV* sv, MAGIC* mg)
+        int (*svt_len)(SV* sv, MAGIC* mg)
+        int (*svt_clear)(SV* sv, MAGIC* mg)
+        int (*svt_free)(SV* sv, MAGIC* mg)
+
+    ctypedef struct MAGIC:
+        MGVTBL* mg_virtual
+
+    MAGIC *mg_find(SV *sv, int type)
+    void sv_magic(SV* sv, SV* obj, int how, const char* name, int namlen)
+
+    void newXS(char* name, void* fn, char* filename)
