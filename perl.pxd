@@ -53,6 +53,7 @@ cdef extern from "perl.h":
 
     SV* newSVrv(SV* rv, char* classname)
     SV* sv_setref_pv(SV *const rv, char* classname, void* pv)
+    bint sv_derived_from(SV* scalar_value, char* classname)
 
     SV* get_sv(char *name, int flags)
     AV* get_av(char *name, int flags)

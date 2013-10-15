@@ -572,6 +572,13 @@ cdef class LazyFunctionVariable(object):
         return self(*args, **kwds).result(True)
 
 cdef _sv_new(perl.SV *sv):
+    cdef perl.MAGIC* magic
+    if(perl.SvROK(sv) and perl.sv_derived_from(sv, "Python::Object")):
+        sv = perl.SvRV(sv)
+        magic = perl.mg_find(sv, <int>('~'))
+        if(magic and magic[0].mg_virtual == &virtual_table):
+            obj = <object><void*>perl.SvIVX(sv)
+            return obj
     ret = ScalarValue()
     ret._sv = perl.SvREFCNT_inc(sv)
     return ret
@@ -623,7 +630,7 @@ cdef perl.SV *_new_sv_from_object(object value):
             
             perl.sv_magic(scalar_value, <perl.SV*>0, <int>('~'), <char*>0, 0)
             magic = perl.mg_find(scalar_value, <int>('~'))
-            magic.mg_virtual = &virtual_table
+            magic[0].mg_virtual = &virtual_table
 
             perl.SvREADONLY(scalar_value)
             return ref_value
