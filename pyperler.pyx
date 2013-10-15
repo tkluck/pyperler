@@ -587,10 +587,6 @@ cdef int _free(perl.SV* sv, perl.MAGIC* mg):
     del obj
 
 cdef perl.MGVTBL virtual_table
-virtual_table.svt_get = NULL
-virtual_table.svt_set = NULL
-virtual_table.svt_len = NULL
-virtual_table.svt_clear = NULL
 virtual_table.svt_free = _free
 
 cdef perl.SV *_new_sv_from_object(object value):
