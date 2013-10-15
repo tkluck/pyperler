@@ -199,6 +199,18 @@ And this even works if you switch between Perl and Python several times:
 >>> #i.Fcall_first(i, "2+2")
 '4'
 
+Test that we recover objects when we pass them through perl
+>>> class FooBar(object):
+...    def foo(self):
+...       return "bar"
+...
+>>> i('sub shifter { shift; }')
+>>> foobar = FooBar()
+>>> type(foobar)
+<class 'pyperler.FooBar'>
+>>> type(i.Fshifter(FooBar()).result(False))
+<class 'pyperler.FooBar'>
+
 
 """
 from libc.stdlib cimport malloc, free
