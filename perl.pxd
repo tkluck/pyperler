@@ -4,6 +4,14 @@ cdef extern from "pyperler.h":
 cdef extern from "EXTERN.h":
     pass
 
+cdef extern from "XSUB.h":
+    int dMARK
+    int dAX
+    int dITEMS
+    int items
+    void XSRETURN(int count)
+    SV **stack
+
 cdef extern from "perl.h":
     ctypedef struct PerlInterpreter:
         int *Imarkstack_ptr
@@ -93,6 +101,7 @@ cdef extern from "perl.h":
     int PUTBACK
     int FREETMPS
     int LEAVE
+    int XSprePUSH
 
     void mXPUSHi(int value)
     void XPUSHs(SV* scalar_value)
@@ -100,7 +109,6 @@ cdef extern from "perl.h":
     int POPl
     char *POPp
     SV *POPs
-    SV * ST(int number)
 
     int SvTYPE(SV *scalar_value)
     int SVt_PVAV
@@ -112,6 +120,7 @@ cdef extern from "perl.h":
     SV* newRV_noinc(SV *scalar_value)
     SV* SvREFCNT_inc(SV *scalar_value)
     SV* SvREFCNT_dec(SV *scalar_value)
+    SV* sv_2mortal(SV *scalar_value)
 
     bint SvOK(SV *scalar_value)
 
@@ -132,3 +141,5 @@ cdef extern from "perl.h":
     void sv_magic(SV* sv, SV* obj, int how, const char* name, int namlen)
 
     void newXS(char* name, void* fn, char* filename)
+
+    SV PL_sv_undef

@@ -185,14 +185,14 @@ a Perl variable:
 You can also pass Python functions as Perl callbacks:
 >>> def f(): return 3 
 >>> i('sub callit { return $_[0]->() }')
->>> #i.Fcallit(f)
+>>> i.Fcallit(f)
 '3'
 >>> def g(x): return x**2
 >>> i('sub pass_three { return $_[0]->(3) }')
->>> #i.Fpass_three(g)
+>>> i.Fpass_three(g)
 '9'
 >>> i('sub call_first { return $_[0]->($_[1]); }')
->>> #i.Fcall_first(eval, "2+2")
+>>> i.Fcall_first(lambda x: eval(str(x)), "2+2")
 '4'
 
 And this even works if you switch between Perl and Python several times:
@@ -214,27 +214,23 @@ cpdef PERL_SYS_INIT3(argv, env):
 
 cdef void call_object(perl.CV* p1, perl.CV* p2):
     perl.dSP
-    cdef int ax = perl.my_perl.Imarkstack_ptr[0]
-    cdef perl.SV **mark = &(perl.my_perl.Istack_base[ax])
-    ax += 1
-    cdef int items = perl.SP - mark
+    perl.dMARK
+    perl.dAX
+    perl.dITEMS
 
-    if items < 1:
-        print "problem"
-        return
+    if perl.items < 1:
+        perl.croak("Cannot use call_object without a Python object")
+        perl.XSRETURN(0)
 
-    perl.ENTER
     try:
-        args = [_sv_new(perl.POPs) for _ in xrange(items-1)]
-        args.reverse()
-        obj = <object><void*>perl.SvIVX(perl.SvRV(perl.POPs))
-        perl.PUSHMARK(perl.SP)
-        perl.XPUSHs(_new_sv_from_object(obj(*args)))
+        args = [_sv_new(perl.stack[i]) for i in xrange(1, perl.items)]
+        obj = <object><void*>perl.SvIVX(perl.SvRV(perl.stack[0]))
+        ret = obj(*args)
+        perl.stack[0] = perl.sv_2mortal(_new_sv_from_object(ret))
+        perl.XSRETURN(1)
     except:
-        perl.croak(sys.exc_type.message)
-    finally:
-        perl.PUTBACK
-        perl.LEAVE
+        exctype, value = sys.exc_info()[:2]
+        perl.croak(value.message)
 
 cdef void dummy(perl.CV* p1, perl.CV* p2):
     perl.dSP
@@ -359,7 +355,11 @@ cdef class LazyExpression:
             return ret[0]
 
     cdef perl.SV* _expression_sv(self):
-        return perl.newSVpvn_utf8(self._expression, len(self._expression), True)
+        if isinstance(self._expression, ScalarValue):
+            return (<ScalarValue>self._expression)._sv
+        else:
+            expression = str(self._expression)
+            return perl.newSVpvn_utf8(expression, len(expression), True)
         
     def __call__(self, *args, **kwds):
         return self.result(False)(*args, **kwds)
@@ -583,12 +583,14 @@ def iter_or_none(value):
         return None
 
 cdef int _free(perl.SV* sv, perl.MAGIC* mg):
-    return 0
-    #TODO
-    obj = <object><void*>perl.SvIVX(perl.SvRV(sv))
+    obj = <object><void*>perl.SvIVX(sv)
     del obj
 
 cdef perl.MGVTBL virtual_table
+virtual_table.svt_get = NULL
+virtual_table.svt_set = NULL
+virtual_table.svt_len = NULL
+virtual_table.svt_clear = NULL
 virtual_table.svt_free = _free
 
 cdef perl.SV *_new_sv_from_object(object value):
@@ -600,34 +602,37 @@ cdef perl.SV *_new_sv_from_object(object value):
     
     cdef perl.MAGIC* magic
 
-    it = iter_or_none(value)
-    if isinstance(value, int):
-        return perl.newSViv(value)
-    elif isinstance(value, str):
-        return perl.newSVpvn_utf8(value, len(value), True)
-    elif isinstance(value, dict):
-        hash_value = perl.newHV()
-        for k, v in value.iteritems():
-            k = str(k)
-            perl.hv_store(hash_value, k, len(k), _new_sv_from_object(v), 0)
-        return perl.newRV_noinc(<perl.SV*>hash_value)
-    elif it: 
-        array_value = perl.newAV()
-        for i in it:
-            perl.av_push(array_value, _new_sv_from_object(i))
-        return perl.newRV_noinc(<perl.SV*>array_value)
-    else:
-        ref_value = perl.newSV(0);
-        scalar_value = perl.newSVrv(ref_value, "Python::Object");
-        Py_XINCREF(<PyObject*>value)
-        perl.SvIV_set(scalar_value, <int><void*>value)
-        
-        #perl.sv_magic(scalar_value, <perl.SV*>0, <int>('~'), <char*>0, 0)
-        #magic = perl.mg_find(scalar_value, <int>('~'))
-        #magic.mg_virtual = &virtual_table
+    try:
+        it = iter_or_none(value)
+        if isinstance(value, int):
+            return perl.newSViv(value)
+        elif isinstance(value, str):
+            return perl.newSVpvn_utf8(value, len(value), True)
+        elif isinstance(value, dict):
+            hash_value = perl.newHV()
+            for k, v in value.iteritems():
+                k = str(k)
+                perl.hv_store(hash_value, k, len(k), _new_sv_from_object(v), 0)
+            return perl.newRV_noinc(<perl.SV*>hash_value)
+        elif it: 
+            array_value = perl.newAV()
+            for i in it:
+                perl.av_push(array_value, _new_sv_from_object(i))
+            return perl.newRV_noinc(<perl.SV*>array_value)
+        else:
+            ref_value = perl.newSV(0);
+            scalar_value = perl.newSVrv(ref_value, "Python::Object");
+            Py_XINCREF(<PyObject*>value)
+            perl.SvIV_set(scalar_value, <int><void*>value)
+            
+            perl.sv_magic(scalar_value, <perl.SV*>0, <int>('~'), <char*>0, 0)
+            magic = perl.mg_find(scalar_value, <int>('~'))
+            magic.mg_virtual = &virtual_table
 
-        perl.SvREADONLY(scalar_value)
-        return ref_value
+            perl.SvREADONLY(scalar_value)
+            return ref_value
+    except:
+        return &perl.PL_sv_undef
 
 cdef _assign_sv(perl.SV *sv, object value):
     if isinstance(value, int):
@@ -689,11 +694,6 @@ cdef class ScalarValue:
         elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
             hash_value = <perl.HV*>ref_value
             perl.hv_store(hash_value, key, len(key), _new_sv_from_object(value), 0)
-            #scalar_value = perl.hv_fetch(hash_value, key, len(key), True)
-            #if scalar_value:
-            #    scalar_value[0] = _new_sv_from_object(value)
-            #else:
-            #    raise IndexError()
 
     def __call__(self, *args, **kwds):
         ret = LazyCalledSub()

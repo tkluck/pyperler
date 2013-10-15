@@ -5,5 +5,5 @@ pyperler: pyperler.pyx perl.pxd setup.py
 interpret:
 	gcc interpret.c -o interpret `perl -MExtUtils::Embed -e ccopts -e ldopts`
 
-test: pyperler
+check: pyperler
 	python test.py
