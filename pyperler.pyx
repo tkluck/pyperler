@@ -230,16 +230,22 @@ cdef void call_object(perl.CV* p1, perl.CV* p2):
     perl.dAX
     perl.dITEMS
 
+    cdef void* obj_ptr
+
     if perl.items < 1:
         perl.croak("Cannot use call_object without a Python object")
         perl.XSRETURN(0)
 
     try:
         args = [_sv_new(perl.stack[i]) for i in xrange(1, perl.items)]
-        obj = <object><void*>perl.SvIVX(perl.SvRV(perl.stack[0]))
-        ret = obj(*args)
-        perl.stack[0] = perl.sv_2mortal(_new_sv_from_object(ret))
-        perl.XSRETURN(1)
+        obj_ptr = <void*>perl.SvIVX(perl.SvRV(perl.stack[0]))
+        if obj_ptr:
+            obj = <object>obj_ptr
+            ret = obj(*args)
+            perl.stack[0] = perl.sv_2mortal(_new_sv_from_object(ret))
+            perl.XSRETURN(1)
+        else:
+            raise RuntimeError("Not a python object")
     except:
         exctype, value = sys.exc_info()[:2]
         perl.croak(value.message)
