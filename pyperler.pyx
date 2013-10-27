@@ -38,6 +38,10 @@ which is also available from Python:
 >>> len(i.Aarray)
 5
 
+Fun with Perl's secret operators:
+>>> i["()= qw / a b c d e /"]
+'5'
+
 Accessing array values:
 >>> i("@d = (10 .. 20)")
 >>> i.Ad.ints()
