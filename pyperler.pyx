@@ -251,19 +251,7 @@ cdef void call_object(perl.CV* p1, perl.CV* p2):
         perl.croak(value.message)
 
 cdef void dummy(perl.CV* p1, perl.CV* p2):
-    perl.dSP
-    cdef int ax = perl.my_perl.Imarkstack_ptr[0]
-    cdef perl.SV **mark = &(perl.my_perl.Istack_base[ax])
-    ax += 1
-    cdef int items = perl.SP - mark
-
-    perl.ENTER
-    for _ in xrange(items):
-        perl.POPs
-    perl.PUSHMARK(perl.SP)
-    perl.PUTBACK
-    perl.LEAVE
-
+    return
 
 cdef void xs_init():
     cdef char *file = "file"
@@ -610,6 +598,7 @@ def iter_or_none(value):
 cdef int _free(perl.SV* sv, perl.MAGIC* mg):
     obj = <object><void*>perl.SvIVX(sv)
     del obj
+    return 0
 
 cdef perl.MGVTBL virtual_table
 virtual_table.svt_free = _free
@@ -644,7 +633,7 @@ cdef perl.SV *_new_sv_from_object(object value):
             ref_value = perl.newSV(0);
             scalar_value = perl.newSVrv(ref_value, "Python::Object");
             Py_XINCREF(<PyObject*>value)
-            perl.SvIV_set(scalar_value, <int><void*>value)
+            perl.SvIV_set(scalar_value, <perl.IV><void*>value)
             
             perl.sv_magic(scalar_value, <perl.SV*>0, <int>('~'), <char*>0, 0)
             magic = perl.mg_find(scalar_value, <int>('~'))

@@ -34,6 +34,9 @@ cdef extern from "perl.h":
     ctypedef struct RV:
         pass
 
+    ctypedef struct IV:
+        pass
+
     PerlInterpreter *perl_alloc()
     bint perl_construct(PerlInterpreter *interpreter)
     bint perl_parse(PerlInterpreter *interpreter, XSINIT_t xsinit, int argc, char** argv, char** env)
@@ -59,9 +62,9 @@ cdef extern from "perl.h":
     AV* get_av(char *name, int flags)
     HV* get_hv(char *name, int flags)
 
-    int SvIV(SV* scalar_value)
-    int SvIVX(SV* scalar_value)
-    bint SvIV_set(SV* scalar_value, int value)
+    IV SvIV(SV* scalar_value)
+    IV SvIVX(SV* scalar_value)
+    bint SvIV_set(SV* scalar_value, IV value)
     char *SvPVutf8_nolen(SV* scalar_value)
     void SvPV_set(SV* scalar_value, char *value)
     void SvREADONLY(SV* scalar_value)
