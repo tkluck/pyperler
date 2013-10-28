@@ -18,11 +18,11 @@ None
 
 Evaluating list expressions in array context:
 >>> i["qw / a b c d e /"].strings()
-['a', 'b', 'c', 'd', 'e']
+('a', 'b', 'c', 'd', 'e')
 
 With perl's weak typing, any non-number string has the integer value 0:
 >>> i["qw / a b c d e /"].ints()
-[0, 0, 0, 0, 0]
+(0, 0, 0, 0, 0)
 
 If we do not cast, we get a list of pyperler.ScalarValue objects. Their
 `repr` is their string value:
@@ -45,21 +45,21 @@ Fun with Perl's secret operators:
 Accessing array values:
 >>> i("@d = (10 .. 20)")
 >>> i.Ad.ints()
-[10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+(10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)
 >>> list(i.Ad)[2]
 '12'
 >>> i.Ad[0] = 9
 >>> int(i['$d[0]'])
 9
 >>> i['@d[0..2]'].ints()
-[9, 11, 12]
+(9, 11, 12)
 >>> i.Ad.ints()
-[9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+(9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)
 
 Assigning iterables to arrays:
 >>> i.Ad = (10 for _ in range(5))
 >>> i.Ad.ints()
-[10, 10, 10, 10, 10]
+(10, 10, 10, 10, 10)
 >>> i.Aletters = "nohtyP ni lreP"
 >>> i('@letters = reverse @letters')
 >>> list(i.Aletters)
@@ -134,14 +134,14 @@ Nested structures:
 Assigning non-string iterables to a nested element will create an arrayref:
 >>> i.Sa['array'] = xrange(2,5)
 >>> i["@{ $a->{array} }"].ints()
-[2, 3, 4]
+(2, 3, 4)
 
 Similarly, assiging a dict to a nested element will create a hashref:
 >>> i.Sa['dictionary'] = {'c': 67, 'd': 68}
 >>> int(i['$a->{dictionary}->{c}'])
 67
 >>> i['keys %{ $a->{dictionary} } '].strings()
-['c', 'd']
+('c', 'd')
 
 Calling subs:
 >>> i("sub do_something { for (1..10) { 2 + 2 }; return 3; }")
@@ -157,7 +157,7 @@ Anonymous subs:
 
 In packages:
 >>> i.F['Car::all_brands']().strings()
-['Toyota', 'Nissan']
+('Toyota', 'Nissan')
 
 Passing a Perl function as a callback to python. You'll need to
 specify whether you want it to evaluate in scalar context or
@@ -361,7 +361,7 @@ cdef class LazyExpression:
         perl.PUTBACK
         if perl.SvTRUE(perl.ERRSV):
             raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
-        ret.reverse()
+        ret = tuple(reversed(ret))
         if(list_context):
             return ret
         else:
@@ -378,44 +378,13 @@ cdef class LazyExpression:
         return self.result(False)(*args, **kwds)
 
     def strings(self):
-        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
-        self._evaluated = True
-
-        perl.dSP
-        cdef int count = perl.eval_sv(self._expression_sv(), perl.G_ARRAY)
-        perl.SPAGAIN
-        ret = [perl.POPp for _ in range(count)]
-        perl.PUTBACK
-        ret.reverse()
-        return ret
+        return tuple(str(x) for x in self)
 
     def ints(self):
-        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
-        self._evaluated = True
-
-        perl.dSP
-        perl.ENTER
-        perl.SAVETMPS
-        cdef int count = perl.eval_sv(self._expression_sv(), perl.G_ARRAY)
-        perl.SPAGAIN
-        ret = [perl.POPl for _ in range(count)]
-        perl.PUTBACK
-        
-        perl.FREETMPS
-        perl.LEAVE
-        ret.reverse()
-        return ret
+        return tuple(int(x) for x in self)
 
     def __iter__(self):
-        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
-        self._evaluated = True
-
-        perl.dSP
-        cdef int count = perl.eval_sv(self._expression_sv(), perl.G_ARRAY)
-        perl.SPAGAIN
-        ret = [_sv_new(perl.POPs) for _ in range(count)]
-        perl.PUTBACK
-        return reversed(ret)
+        return iter(self.result(True))
 
     def __str__(self):
         if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
@@ -805,10 +774,10 @@ cdef class LazyCalledSub:
             yield r
 
     def strings(self):
-        return [str(e) for e in self]
+        return tuple(str(e) for e in self)
 
     def ints(self):
-        return [int(e) for e in self]
+        return tuple(int(e) for e in self)
 
     def __int__(self):
         return int(self.result(False))
