@@ -202,6 +202,9 @@ You can also pass Python functions as Perl callbacks:
 And this even works if you switch between Perl and Python several times:
 >>> #i.Fcall_first(i, "2+2")
 '4'
+>>> def h(x): return int(i[x])
+>>> i.Fcall_first(h, "2+2")
+'4'
 
 Test that we recover objects when we pass them through perl
 >>> class FooBar(object):
@@ -639,18 +642,18 @@ cdef perl.SV *_new_sv_from_object(object value):
             Py_XINCREF(<PyObject*>value)
             perl.SvIV_set(scalar_value, <perl.IV><void*>value)
             
-            perl.sv_magic(scalar_value, <perl.SV*>0, <int>('~'), <char*>0, 0)
+            perl.sv_magic(scalar_value, scalar_value, <int>('~'), <char*>0, 0)
             magic = perl.mg_find(scalar_value, <int>('~'))
             magic[0].mg_virtual = &virtual_table
 
-            perl.SvREADONLY(scalar_value)
+            #perl.SvREADONLY(scalar_value)
             return ref_value
     except:
         return &perl.PL_sv_undef
 
 cdef _assign_sv(perl.SV *sv, object value):
     if isinstance(value, int):
-        perl.SvIV_set(sv, value)
+        perl.SvIV_set(sv, <perl.IV><unsigned long>value)
     elif isinstance(value, str):
         perl.SvPV_set(sv, value)
     elif isinstance(value, list):
@@ -666,7 +669,7 @@ cdef class ScalarValue:
         return perl.SvPVutf8_nolen(self._sv)
 
     def __int__(self):
-        return perl.SvIV(self._sv)
+        return <int>perl.SvIV(self._sv)
 
     def __pow__(self, e, z):
         return int(self)**e
