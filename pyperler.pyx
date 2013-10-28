@@ -46,6 +46,8 @@ Accessing array values:
 >>> i("@d = (10 .. 20)")
 >>> i.Ad.ints()
 (10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)
+>>> i.Ad[2]
+'12'
 >>> list(i.Ad)[2]
 '12'
 >>> i.Ad[0] = 9
@@ -186,6 +188,15 @@ a Perl variable:
 >>> i.Fp(2,3)
 '8'
 
+But the canonical way is this:
+>>> Car = i.use('Car')
+>>> car = Car()
+>>> _ = car.drive(20)
+>>> _ = car.set_brand('Honda')
+>>> del _
+>>> car.brand()
+'Honda'
+
 You can also pass Python functions as Perl callbacks:
 >>> def f(): return 3 
 >>> i('sub callit { return $_[0]->() }')
@@ -315,6 +326,10 @@ class Interpreter(object):
                     def __getitem__(self, key):
                         return LazyFunctionVariable(self, key)
                 return FunctionLookup()
+        elif name == 'use':
+            def perl_package_constructor(package_name):
+                return PerlPackage(self, package_name)
+            return perl_package_constructor
         else:
             return object.__getattribute__(self, name)
 
@@ -339,6 +354,17 @@ class Interpreter(object):
                 perl.hv_store(hash_value, k, len(k), _new_sv_from_object(v), 0)
         else:
             return object.__setattr__(self, initial + name, value)
+
+cdef class PerlPackage:
+    cdef object _interpreter
+    cdef object _name
+    def __init__(self, interpreter, name):
+        self._interpreter = interpreter
+        self._name = name
+        interpreter('use ' + name)
+
+    def __call__(self, *args, **kwds):
+        return self._interpreter[self._name + '->new'].result(False)
 
 cdef class LazyExpression:
     cdef object _interpreter
@@ -425,6 +451,11 @@ cdef class LazyExpression:
     def list_context(self, *args, **kwds):
         return self(*args, **kwds).result(True)
 
+    def __getattr__(self, name):
+        ret = BoundMethod()
+        ret._sv = self._expression_sv()
+        ret._method = name
+        return ret
 
 cdef class LazyScalarVariable(LazyExpression):
     cdef object _name
