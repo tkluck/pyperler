@@ -201,7 +201,8 @@ You can also pass Python functions as Perl callbacks:
 
 And this even works if you switch between Perl and Python several times:
 >>> #i.Fcall_first(i, "2+2")
-'4'
+
+And also when we don't discard the return value:
 >>> def h(x): return int(i[x])
 >>> i.Fcall_first(h, "2+2")
 '4'
@@ -217,8 +218,6 @@ Test that we recover objects when we pass them through perl
 <class 'pyperler.FooBar'>
 >>> type(i.Fshifter(FooBar()).result(False))
 <class 'pyperler.FooBar'>
-
-
 """
 from libc.stdlib cimport malloc, free
 from cpython.string cimport PyString_AsString
@@ -295,7 +294,7 @@ class Interpreter(object):
         self._interpreter.run()
 
     def __call__(self, code):
-        self._interpreter.eval_pv(code, True)
+        self[code].result(False)
 
     def __getitem__(self, expression):
         return LazyExpression(self, expression)
@@ -600,6 +599,8 @@ cdef perl.SV *_new_sv_from_object(object value):
                 k = str(k)
                 perl.hv_store(hash_value, k, len(k), _new_sv_from_object(v), 0)
             return perl.newRV_noinc(<perl.SV*>hash_value)
+        elif isinstance(value, ScalarValue):
+            return (<ScalarValue>value)._sv
         elif it: 
             array_value = perl.newAV()
             for i in it:
