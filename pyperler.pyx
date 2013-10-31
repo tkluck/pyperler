@@ -230,8 +230,8 @@ Test that we recover objects when we pass them through perl
 >>> type(i.Fshifter(FooBar()).result(False))
 <class 'pyperler.FooBar'>
 
->>> i('use Text::Table')
->>> t = i['Text::Table'].new("Planet", "Radius\nkm", "Density\ng/cm^3").result(False)
+>>> Text = i.use('Text::Table')
+>>> t = Text("Planet", "Radius\nkm", "Density\ng/cm^3")
 >>> _ = t.load(
 ...    [ "Mercury", 2360, 3.7 ],
 ...    [ "Venus", 6110, 5.1 ],
@@ -394,7 +394,10 @@ cdef class PerlPackage:
         interpreter('use ' + name)
 
     def __call__(self, *args, **kwds):
-        return self._interpreter[self._name + '->new'].result(False)
+        cdef BoundMethod bound_method = BoundMethod()
+        bound_method._method = "new"
+        bound_method._sv = _new_sv_from_object(str(self._name))
+        return bound_method(*args, **kwds).result(False)
 
 cdef class LazyExpression:
     cdef object _interpreter
