@@ -256,6 +256,10 @@ Using list context:
 Test using more than 32-bits numbers:
 >>> i['sub { shift; }'](2**38)
 '274877906944'
+
+Test using negative numbers:
+>>> i['sub { shift; }'](-1)
+'-1'
 """
 from libc.stdlib cimport malloc, free
 cimport dlfcn
