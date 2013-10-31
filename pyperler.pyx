@@ -229,8 +229,30 @@ Test that we recover objects when we pass them through perl
 <class 'pyperler.FooBar'>
 >>> type(i.Fshifter(FooBar()).result(False))
 <class 'pyperler.FooBar'>
+
+>>> i('use Text::Table')
+>>> t = i['Text::Table'].new("Planet", "Radius\nkm", "Density\ng/cm^3").result(False)
+>>> t.load(
+...    [ "Mercury", 2360, 3.7 ],
+...    [ "Venus", 6110, 5.1 ],
+...    [ "Earth", 6378, 5.52 ],
+...    [ "Jupiter", 71030, 1.3 ],
+... );
+>>> print str(t.table())
+ Planet  Radius Density
+          km     g/cm^3
+  Mercury  2360  3.7
+  Venus    6110  5.1
+  Earth    6378  5.52
+  Jupiter 71030  1.3
+
+Using list context:
+>>> a,b,c = i['qw / alpha beta gamma /']
+>>> b
+'beta'
 """
 from libc.stdlib cimport malloc, free
+cimport dlfcn
 from cpython.string cimport PyString_AsString
 from cpython cimport PyObject, Py_XINCREF
 cimport perl
@@ -272,6 +294,8 @@ cdef void dummy(perl.CV* p1, perl.CV* p2):
 
 cdef void xs_init():
     cdef char *file = "file"
+
+    perl.newXS("DynaLoader::boot_DynaLoader", &perl.boot_DynaLoader, file);
     perl.newXS("Python::PyObject_CallObject", <void*>&call_object, file)
     perl.newXS("Python::bootstrap", &dummy, file)
     perl.newXS("Python::Object::bootstrap", &dummy, file)
@@ -829,3 +853,10 @@ cdef class LazyCalledSub:
         return int(self) + other
 import sys,os
 PERL_SYS_INIT3(sys.argv, os.environ)
+
+# we need to import the perl libary with RTLD_GLOBAL, because many compiled CPAN
+# modules assume that those symbols are available. Python does not import the
+# library's symbols into a global namespace
+cdef void* handle=dlfcn.dlopen("libperl.so",dlfcn.RTLD_LAZY|dlfcn.RTLD_GLOBAL)
+if(not handle):
+    raise RuntimeError("Could not load perl: %s" % dlfcn.dlerror())
