@@ -252,6 +252,10 @@ Using list context:
 >>> a,b,c = i['qw / alpha beta gamma /']
 >>> b
 'beta'
+
+Test using more than 32-bits numbers:
+>>> i['sub { shift; }'](2**38)
+'274877906944'
 """
 from libc.stdlib cimport malloc, free
 cimport dlfcn
@@ -698,7 +702,10 @@ cdef class ScalarValue:
         return perl.SvPVutf8_nolen(self._sv)
 
     def __int__(self):
-        return <int>perl.SvIV(self._sv)
+        return <long>perl.SvIV(self._sv)
+
+    def __float__(self):
+        return <double>perl.SvNV(self._sv)
 
     def __pow__(self, e, z):
         return int(self)**e
