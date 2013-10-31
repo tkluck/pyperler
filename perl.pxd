@@ -52,7 +52,8 @@ cdef extern from "perl.h":
 
     SV *newSV(int len)
     SV *newSVpvn_utf8(char *value, int length, bint utf8)
-    SV *newSViv(int value)
+    SV *newSViv(long value)
+    SV *newSVnv(double value)
 
     SV* newSVrv(SV* rv, char* classname)
     SV* sv_setref_pv(SV *const rv, char* classname, void* pv)

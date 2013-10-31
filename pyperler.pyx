@@ -232,19 +232,21 @@ Test that we recover objects when we pass them through perl
 
 >>> i('use Text::Table')
 >>> t = i['Text::Table'].new("Planet", "Radius\nkm", "Density\ng/cm^3").result(False)
->>> t.load(
+>>> _ = t.load(
 ...    [ "Mercury", 2360, 3.7 ],
 ...    [ "Venus", 6110, 5.1 ],
 ...    [ "Earth", 6378, 5.52 ],
 ...    [ "Jupiter", 71030, 1.3 ],
-... );
+... )
+>>> del _
 >>> print str(t.table())
- Planet  Radius Density
-          km     g/cm^3
-  Mercury  2360  3.7
-  Venus    6110  5.1
-  Earth    6378  5.52
-  Jupiter 71030  1.3
+Planet  Radius Density
+        km     g/cm^3 
+Mercury  2360  3.7    
+Venus    6110  5.1    
+Earth    6378  5.52   
+Jupiter 71030  1.3    
+<BLANKLINE>
 
 Using list context:
 >>> a,b,c = i['qw / alpha beta gamma /']
@@ -646,6 +648,8 @@ cdef perl.SV *_new_sv_from_object(object value):
         it = iter_or_none(value)
         if isinstance(value, int):
             return perl.newSViv(value)
+        elif isinstance(value, float):
+            return perl.newSVnv(value)
         elif isinstance(value, str):
             return perl.newSVpvn_utf8(value, len(value), True)
         elif isinstance(value, dict):
@@ -854,7 +858,7 @@ cdef class LazyCalledSub:
 import sys,os
 PERL_SYS_INIT3(sys.argv, os.environ)
 
-# we need to import the perl libary with RTLD_GLOBAL, because many compiled CPAN
+# we need to reload the perl libary with RTLD_GLOBAL, because many compiled CPAN
 # modules assume that those symbols are available. Python does not import the
 # library's symbols into a global namespace
 cdef void* handle=dlfcn.dlopen("libperl.so",dlfcn.RTLD_LAZY|dlfcn.RTLD_GLOBAL)
