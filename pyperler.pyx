@@ -260,6 +260,18 @@ Test using more than 32-bits numbers:
 Test using negative numbers:
 >>> i['sub { shift; }'](-1)
 '-1'
+
+Test passing blessed scalar values through Python:
+>>> i.Sdaewoo_matiz = Car()
+>>> i['ref $daewoo_matiz']
+'Car'
+
+We even support introspection if your local CPAN installation sports Class::Inspector:
+>>> Car.__dir__()
+['all_brands', 'brand', 'distance', 'drive', 'new', 'out_of_gas', 'set_brand']
+>>> nissan_sunny = Car()
+>>> nissan_sunny.__dir__()
+['all_brands', 'brand', 'distance', 'drive', 'new', 'out_of_gas', 'set_brand']
 """
 from libc.stdlib cimport malloc, free
 cimport dlfcn
@@ -286,7 +298,7 @@ cdef void call_object(perl.CV* p1, perl.CV* p2):
         perl.XSRETURN(0)
 
     try:
-        args = [_sv_new(perl.stack[i]) for i in xrange(1, perl.items)]
+        args = [_sv_new(perl.stack[i], None) for i in xrange(1, perl.items)]
         obj_ptr = <void*>perl.SvIVX(perl.SvRV(perl.stack[0]))
         if obj_ptr:
             obj = <object>obj_ptr
@@ -395,13 +407,31 @@ cdef class PerlPackage:
     def __init__(self, interpreter, name):
         self._interpreter = interpreter
         self._name = name
-        interpreter('use ' + name)
+        try:
+            interpreter('use ' + name)
+        except RuntimeError:
+            raise ImportError("Could not import Perl package %s" % self._name)
 
     def __call__(self, *args, **kwds):
         cdef BoundMethod bound_method = BoundMethod()
         bound_method._method = "new"
         bound_method._sv = _new_sv_from_object(str(self._name))
+        bound_method._interpreter = self._interpreter
         return bound_method(*args, **kwds).result(False)
+
+    def __getattr__(self, name):
+        cdef BoundMethod bound_method = BoundMethod()
+        bound_method._method = name
+        bound_method._sv = _new_sv_from_object(str(self._name))
+        bound_method._interpreter = self._interpreter
+        return bound_method
+
+    def __dir__(self):
+        try:
+            Inspector = self._interpreter.use('Class::Inspector')
+            return Inspector.methods(self._name).result(False).strings()
+        except ImportError:
+            return []
 
 cdef class LazyExpression:
     cdef object _interpreter
@@ -419,7 +449,7 @@ cdef class LazyExpression:
         perl.dSP
         cdef int count = perl.eval_sv(self._expression_sv(), perl.G_EVAL|flag)
         perl.SPAGAIN
-        ret = [_sv_new(perl.POPs) for _ in range(count)]
+        ret = [_sv_new(perl.POPs, self._interpreter) for _ in range(count)]
         perl.PUTBACK
         if perl.SvTRUE(perl.ERRSV):
             raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
@@ -492,6 +522,7 @@ cdef class LazyExpression:
         ret = BoundMethod()
         ret._sv = self._expression_sv()
         ret._method = name
+        ret._interpreter = self._interpreter
         return ret
 
 cdef class LazyScalarVariable(LazyExpression):
@@ -502,11 +533,11 @@ cdef class LazyScalarVariable(LazyExpression):
 
     def __getitem__(self, key):
         cdef perl.SV** scalar_value
-        return _sv_new(perl.get_sv(self._name, 0))[key]
+        return _sv_new(perl.get_sv(self._name, 0), self._interpreter)[key]
 
     def __setitem__(self, key, value):
         cdef perl.HV* hash_value
-        _sv_new(perl.get_sv(self._name, 0))[key] = value
+        _sv_new(perl.get_sv(self._name, 0), self._interpreter)[key] = value
 
     def __iter__(self):
         yield self
@@ -515,6 +546,7 @@ cdef class LazyScalarVariable(LazyExpression):
         ret = BoundMethod()
         ret._sv = perl.SvREFCNT_inc(perl.get_sv(self._name, 0))
         ret._method = name
+        ret._interpreter = self._interpreter
         return ret
 
 cdef class LazyArrayVariable(LazyExpression):
@@ -528,7 +560,7 @@ cdef class LazyArrayVariable(LazyExpression):
         cdef perl.AV* array_value
         array_value = perl.get_av(self._name, 0)
         scalar_value = perl.av_fetch(array_value, key, False)
-        return _sv_new(scalar_value[0])
+        return _sv_new(scalar_value[0], self._interpreter)
         
     def __setitem__(self, key, value):
         cdef perl.AV* array_value
@@ -546,7 +578,7 @@ cdef class LazyArrayVariable(LazyExpression):
         count = perl.av_len(array_value)
         for i in range(count+1):
             scalar_value = perl.av_fetch(array_value, i, False)
-            yield _sv_new(scalar_value[0])
+            yield _sv_new(scalar_value[0], self._interpreter)
 
     def __len__(self):
         cdef perl.AV* array_value
@@ -567,7 +599,7 @@ cdef class LazyHashVariable(LazyExpression):
         cdef perl.HV* hash_value
         hash_value = perl.get_hv(self._name, 0)
         scalar_value = perl.hv_fetch(hash_value, key, len(key), False)
-        return _sv_new(scalar_value[0])
+        return _sv_new(scalar_value[0], self._interpreter)
         
     def __setitem__(self, key, value):
         cdef perl.HV* hash_value
@@ -591,7 +623,7 @@ cdef class LazyHashVariable(LazyExpression):
         count = perl.hv_iterinit(hash_value)
         for i in range(count):
             sv = perl.hv_iternextsv(hash_value, &key, &retlen)
-            yield key, _sv_new(sv)
+            yield key, _sv_new(sv, self._interpreter)
 
     def dict(self):
         return {key: value for key, value in self}
@@ -604,14 +636,17 @@ cdef class LazyHashVariable(LazyExpression):
 
 cdef class LazyFunctionVariable(object):
     cdef object _name
+    cdef object _interpreter
     def __init__(self, interpreter, name):
         self._name = name
+        self._interpreter = interpreter
 
     def __call__(self, *args, **kwds):
         ret = LazyCalledSub()
         ret._name = self._name
         ret._args = args;
         ret._kwds = kwds;
+        ret._interpreter = self._interpreter
         return ret
 
     def scalar_context(self, *args, **kwds):
@@ -620,7 +655,7 @@ cdef class LazyFunctionVariable(object):
     def list_context(self, *args, **kwds):
         return self(*args, **kwds).result(True)
 
-cdef _sv_new(perl.SV *sv):
+cdef _sv_new(perl.SV *sv, object interpreter):
     cdef perl.MAGIC* magic
     if(perl.SvROK(sv) and perl.sv_derived_from(sv, "Python::Object")):
         sv = perl.SvRV(sv)
@@ -629,6 +664,7 @@ cdef _sv_new(perl.SV *sv):
             obj = <object><void*>perl.SvIVX(sv)
             return obj
     ret = ScalarValue()
+    ret._interpreter = interpreter
     ret._sv = perl.SvREFCNT_inc(sv)
     return ret
 
@@ -692,15 +728,22 @@ cdef perl.SV *_new_sv_from_object(object value):
         return &perl.PL_sv_undef
 
 cdef _assign_sv(perl.SV *sv, object value):
-    if isinstance(value, int):
+    if value is None:
+        sv = &perl.PL_sv_undef
+    elif isinstance(value, int):
         perl.SvIV_set(sv, <perl.IV><unsigned long>value)
     elif isinstance(value, str):
         perl.SvPV_set(sv, value)
+    elif isinstance(value, ScalarValue):
+        perl.SvSetSV_nosteal(sv, (<ScalarValue>value)._sv)
     elif isinstance(value, list):
+        raise NotImplementedError()
+    else:
         raise NotImplementedError()
 
 cdef class ScalarValue:
     cdef perl.SV *_sv
+    cdef object _interpreter
 
     def __dealloc(self):
         perl.SvREFCNT_dec(self._sv)
@@ -723,6 +766,25 @@ cdef class ScalarValue:
         else:
             return 'None'
 
+    def __len__(self):
+        cdef perl.AV* array_value
+        cdef perl.SV* ref_value
+        if not perl.SvROK(self._sv):
+            raise TypeError("not an array ref")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
+            array_value = <perl.AV*>ref_value
+            if array_value:
+                return perl.av_len(array_value) + 1
+            else:
+                raise RuntimeError()
+        else:
+            raise TypeError("not an array ref")
+
+    def __iter__(self):
+        for ix in xrange(len(self)):
+            yield self[ix]
+
     def __getitem__(self, key):
         cdef perl.SV** scalar_value
         cdef perl.AV* array_value
@@ -734,11 +796,11 @@ cdef class ScalarValue:
         if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
             array_value = <perl.AV*>ref_value
             scalar_value = perl.av_fetch(array_value, key, False)
-            return _sv_new(scalar_value[0])
+            return _sv_new(scalar_value[0], self._interpreter)
         elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
             hash_value = <perl.HV*>ref_value
             scalar_value = perl.hv_fetch(hash_value, key, len(key), False)
-            return _sv_new(scalar_value[0])
+            return _sv_new(scalar_value[0], self._interpreter)
         
     def __setitem__(self, key, value):
         cdef perl.SV** scalar_value
@@ -760,17 +822,38 @@ cdef class ScalarValue:
         ret._sv = perl.SvREFCNT_inc(self._sv)
         ret._args = args
         ret._kwds = kwds
+        ret._interpreter = self._interpreter
         return ret
 
     def __getattr__(self, name):
         ret = BoundMethod()
         ret._sv = perl.SvREFCNT_inc(self._sv)
         ret._method = name
+        ret._interpreter = self._interpreter
         return ret
+
+    def strings(self):
+        return [str(_) for _ in self]
+
+    def ints(self):
+        return [int(_) for _ in self]
+
+    def __dir__(self):
+        try:
+            Inspector = self._interpreter.use('Class::Inspector')
+            ### FIXME Can't find a C api function to get the package this SV is blessed into?
+            self._interpreter.S__internal_pyperler_use = self
+            classname = str(self._interpreter['ref $__internal_pyperler_use'])
+            self._interpreter.S__internal_pyperler_use = None
+            return Inspector.methods(classname).result(False).strings()
+        except ImportError:
+            return []
+        
 
 cdef class BoundMethod:
     cdef perl.SV *_sv
     cdef object _method
+    cdef object _interpreter
 
     def __call__(self, *args, **kwds):
         ret = LazyCalledSub()
@@ -778,6 +861,7 @@ cdef class BoundMethod:
         ret._method = self._method
         ret._args = args
         ret._kwds = kwds
+        ret._interpreter = self._interpreter
         return ret
     
     def __dealloc__(self):
@@ -786,6 +870,7 @@ cdef class BoundMethod:
 cdef class LazyCalledSub:
     cdef object _name
     cdef object _method
+    cdef object _interpreter
     cdef perl.SV* _sv
 
     cdef perl.SV *_self
@@ -824,7 +909,7 @@ cdef class LazyCalledSub:
             else:
                 raise AssertionError()
             perl.SPAGAIN
-            ret = [_sv_new(perl.POPs) for i in range(count)]
+            ret = [_sv_new(perl.POPs, self._interpreter) for i in range(count)]
             ret.reverse()
             if perl.SvTRUE(perl.ERRSV):
                 raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))

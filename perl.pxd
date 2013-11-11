@@ -73,6 +73,7 @@ cdef extern from "perl.h":
     void SvPV_set(SV* scalar_value, char *value)
     void SvREADONLY(SV* scalar_value)
     NV SvNV(SV* scalar_value)
+    void SvSetSV_nosteal(SV* dsv, SV* ssv)
 
     AV *newAV()
     SV **av_fetch(AV* array_value, int key, bint lval)
