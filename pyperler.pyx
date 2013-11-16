@@ -230,8 +230,8 @@ Test that we recover objects when we pass them through perl
 >>> type(i.Fshifter(FooBar()).result(False))
 <class 'pyperler.FooBar'>
 
->>> Text = i.use('Text::Table')
->>> t = Text("Planet", "Radius\nkm", "Density\ng/cm^3")
+>>> Table = i.use('Text::Table')
+>>> t = Table("Planet", "Radius\nkm", "Density\ng/cm^3")
 >>> _ = t.load(
 ...    [ "Mercury", 2360, 3.7 ],
 ...    [ "Venus", 6110, 5.1 ],
@@ -736,10 +736,8 @@ cdef _assign_sv(perl.SV *sv, object value):
         perl.SvPV_set(sv, value)
     elif isinstance(value, ScalarValue):
         perl.SvSetSV_nosteal(sv, (<ScalarValue>value)._sv)
-    elif isinstance(value, list):
-        raise NotImplementedError()
     else:
-        raise NotImplementedError()
+        perl.SvSetSV(sv, _new_sv_from_object(value))
 
 cdef class ScalarValue:
     cdef perl.SV *_sv
