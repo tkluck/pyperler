@@ -841,10 +841,7 @@ cdef class ScalarValue:
     def __dir__(self):
         try:
             Inspector = self._interpreter.use('Class::Inspector')
-            ### FIXME Can't find a C api function to get the package this SV is blessed into?
-            self._interpreter.S__internal_pyperler_use = self
-            classname = str(self._interpreter['ref $__internal_pyperler_use'])
-            self._interpreter.S__internal_pyperler_use = None
+            classname = str(self._interpreter['sub { ref $_[0]; }'](self))
             return Inspector.methods(classname).result(False).strings()
         except ImportError:
             return []
