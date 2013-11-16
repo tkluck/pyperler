@@ -862,6 +862,12 @@ cdef class BoundMethod:
     def __dealloc__(self):
         perl.SvREFCNT_dec(self._sv)
 
+    def scalar_context(self, *args, **kwds):
+        return self(*args, **kwds).result(False)
+
+    def list_context(self, *args, **kwds):
+        return self(*args, **kwds).result(True)
+
 cdef class LazyCalledSub:
     cdef object _name
     cdef object _method
@@ -916,12 +922,6 @@ cdef class LazyCalledSub:
             perl.PUTBACK
             perl.FREETMPS
             perl.LEAVE
-
-    def scalar_context(self, *args, **kwds):
-        return self(*args, **kwds).result(False)
-
-    def list_context(self, *args, **kwds):
-        return self(*args, **kwds).result(True)
 
     def __iter__(self):
         for r in self.result(True):
