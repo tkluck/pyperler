@@ -4,11 +4,9 @@ PyPerler
 Quick install
 -------------
 
-You'll need cython, perl and the perl headers. On Ubuntu, the first two are just
+You'll need cython, perl and the perl headers. On Ubuntu, these are just
 
-    $ sudo apt-get install cython perl-base
-
-but I don't know how to get the files in /usr/lib/perl/5.14/CORE/, maybe CPAN?
+    $ sudo apt-get install cython perl-base perl
 
 Then compilation and installation is 
 
@@ -48,9 +46,6 @@ preferred way, as it also supports setting:
 
 There is support for hashes and objects (blessed references), too. See the
 doctests for more examples.
-
-Support for direct function calling is planned, as is passing Python functions
-as callbacks to Perl.
 
 License
 -------
