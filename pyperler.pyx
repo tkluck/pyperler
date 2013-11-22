@@ -409,8 +409,8 @@ cdef class PerlPackage:
         self._name = name
         try:
             interpreter('use ' + name)
-        except RuntimeError:
-            raise ImportError("Could not import Perl package %s" % self._name)
+        except RuntimeError as e:
+            raise ImportError("Could not import Perl package %s: %s" % (self._name, e.message))
 
     def __call__(self, *args, **kwds):
         cdef BoundMethod bound_method = BoundMethod()
@@ -430,7 +430,7 @@ cdef class PerlPackage:
         try:
             Inspector = self._interpreter.use('Class::Inspector')
             return Inspector.methods(self._name).result(False).strings()
-        except ImportError:
+        except (ImportError, TypeError):
             return []
 
 cdef class LazyExpression:
@@ -461,7 +461,7 @@ cdef class LazyExpression:
 
     cdef perl.SV* _expression_sv(self):
         if isinstance(self._expression, ScalarValue):
-            return (<ScalarValue>self._expression)._sv
+            return perl.SvREFCNT_inc((<ScalarValue>self._expression)._sv)
         else:
             expression = str(self._expression)
             return perl.newSVpvn_utf8(expression, len(expression), True)
@@ -706,7 +706,7 @@ cdef perl.SV *_new_sv_from_object(object value):
                 perl.hv_store(hash_value, k, len(k), _new_sv_from_object(v), 0)
             return perl.newRV_noinc(<perl.SV*>hash_value)
         elif isinstance(value, ScalarValue):
-            return (<ScalarValue>value)._sv
+            return perl.SvREFCNT_inc((<ScalarValue>value)._sv)
         elif it: 
             array_value = perl.newAV()
             for i in it:
@@ -743,7 +743,7 @@ cdef class ScalarValue:
     cdef perl.SV *_sv
     cdef object _interpreter
 
-    def __dealloc(self):
+    def __dealloc__(self):
         perl.SvREFCNT_dec(self._sv)
 
     def __str__(self):
