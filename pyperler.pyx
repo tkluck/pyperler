@@ -872,7 +872,7 @@ cdef class ScalarValue:
             Inspector = self._interpreter.use('Class::Inspector')
             classname = str(self._interpreter['sub { ref $_[0]; }'](self))
             return Inspector.methods(classname).result(False).strings()
-        except ImportError:
+        except (ImportError, TypeError):
             return []
         
 
