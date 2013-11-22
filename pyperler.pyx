@@ -780,8 +780,25 @@ cdef class ScalarValue:
             raise TypeError("not an array ref")
 
     def __iter__(self):
-        for ix in xrange(len(self)):
-            yield self[ix]
+        cdef perl.SV** scalar_value
+        cdef perl.AV* array_value
+        cdef perl.HV* hash_value
+        cdef perl.SV* ref_value
+        cdef int count
+        cdef char* key
+        cdef int retlen
+        if not perl.SvROK(self._sv):
+            raise TypeError("not an array or hash")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
+            for ix in xrange(len(self)):
+                yield self[ix]
+        elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
+            hash_value = <perl.HV*>ref_value
+            count = perl.hv_iterinit(hash_value)
+            for i in range(count):
+                sv = perl.hv_iternextsv(hash_value, &key, &retlen)
+                yield key, _sv_new(sv, self._interpreter)
 
     def __getitem__(self, key):
         cdef perl.SV** scalar_value
@@ -829,6 +846,20 @@ cdef class ScalarValue:
         ret._method = name
         ret._interpreter = self._interpreter
         return ret
+
+    def dict(self):
+        """
+            >>> import pyperler; i = pyperler.Interpreter()
+            >>> i['{a => 1, b => 2}'].result(False).dict()
+            {'a': '1', 'b': '2'}
+        """
+        return {key: value for key, value in self}
+
+    def keys(self):
+        return self.dict().keys()
+
+    def values(self):
+        return self.dict().values()
 
     def strings(self):
         return [str(_) for _ in self]
