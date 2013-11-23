@@ -366,14 +366,15 @@ class Interpreter(object):
 
     def __getattribute__(self, name):
         initial = name[0].upper()
-        cdef perl.SV *sv
+        cdef perl.SV *ref_value
         cdef perl.AV *array_value
         cdef perl.HV *hash_value
         if initial in 'SD':
             short_name = name[1:]
             return _sv_new(perl.get_sv(short_name, 0), self)
         elif initial == 'A':
-            return LazyArrayVariable(self, name[1:])
+            short_name = name[1:]
+            return _sv_new(perl.newRV_inc(<perl.SV*>perl.get_av(short_name, 0)), self)
         elif initial in 'PH': 
             return LazyHashVariable(self, name[1:])
         elif initial == 'F':
@@ -461,7 +462,7 @@ cdef class PerlPackage:
     def __dir__(self):
         try:
             Inspector = self._interpreter.use('Class::Inspector')
-            return Inspector.methods(self._name).result(False).strings()
+            return [str(method) for method in Inspector.methods(self._name).result(False)]
         except (ImportError, TypeError):
             return []
 
@@ -549,45 +550,6 @@ cdef class LazyExpression:
         ret._method = name
         ret._interpreter = self._interpreter
         return ret
-
-cdef class LazyArrayVariable(LazyExpression):
-    cdef object _name
-    def __init__(self, interpreter, name):
-        self._name = name
-        LazyExpression.__init__(self, interpreter, '@' + name)
-
-    def __getitem__(self, key):
-        cdef perl.SV** scalar_value
-        cdef perl.AV* array_value
-        array_value = perl.get_av(self._name, 0)
-        scalar_value = perl.av_fetch(array_value, key, False)
-        return _sv_new(scalar_value[0], self._interpreter)
-        
-    def __setitem__(self, key, value):
-        cdef perl.AV* array_value
-        cdef perl.SV** scalar_value
-        array_value = perl.get_av(self._name, 0)
-        perl.av_store(array_value, key, _new_sv_from_object(value))
-
-    def __iter__(self):
-        cdef perl.SV** scalar_value
-        cdef perl.AV* array_value
-        cdef int i
-        cdef int count
-
-        array_value = perl.get_av(self._name, 0)
-        count = perl.av_len(array_value)
-        for i in range(count+1):
-            scalar_value = perl.av_fetch(array_value, i, False)
-            yield _sv_new(scalar_value[0], self._interpreter)
-
-    def __len__(self):
-        cdef perl.AV* array_value
-        array_value = perl.get_av(self._name, 0)
-        if array_value:
-            return perl.av_len(array_value) + 1
-        else:
-            raise RuntimeError()
 
 cdef class LazyHashVariable(LazyExpression):
     cdef object _name
@@ -869,16 +831,16 @@ cdef class ScalarValue:
         return self.dict().values()
 
     def strings(self):
-        return [str(_) for _ in self]
+        return tuple(str(_) for _ in self)
 
     def ints(self):
-        return [int(_) for _ in self]
+        return tuple(int(_) for _ in self)
 
     def __dir__(self):
         try:
             Inspector = self._interpreter.use('Class::Inspector')
             classname = str(self._interpreter['sub { ref $_[0]; }'](self))
-            return Inspector.methods(classname).result(False).strings()
+            return [str(method) for method in Inspector.methods(classname).result(False)]
         except (ImportError, TypeError):
             return []
         
