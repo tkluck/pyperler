@@ -196,7 +196,7 @@ You can also pass Python functions as Perl callbacks:
 4
 
 And this even works if you switch between Perl and Python several times:
->>> #i.Fcall_first(i, "2+2")
+>>> i.Fcall_first(i, "2+2")
 
 And also when we don't discard the return value:
 >>> def h(x): return int(i[x])
@@ -337,10 +337,10 @@ class Interpreter(object):
         self._interpreter.run()
 
     def __call__(self, code):
-        self[code].result(False)
+        self[str(code)].result(False)
 
     def __getitem__(self, expression):
-        return LazyExpression(self, expression)
+        return LazyExpression(self, str(expression))
 
     def __getattribute__(self, name):
         """
@@ -560,12 +560,6 @@ cdef _sv_new(perl.SV *sv, object interpreter):
     ret._sv = perl.SvREFCNT_inc(sv)
     return ret
 
-def iter_or_none(value):
-    try:
-        return iter(value)
-    except TypeError:
-        return None
-
 cdef int _free(perl.SV* sv, perl.MAGIC* mg):
     obj = <object><void*>perl.SvIVX(sv)
     del obj
@@ -598,10 +592,9 @@ cdef perl.SV *_new_sv_from_object(object value):
             return perl.newRV_noinc(<perl.SV*>hash_value)
         elif isinstance(value, ScalarValue):
             return perl.SvREFCNT_inc((<ScalarValue>value)._sv)
-        it = iter_or_none(value)
-        if it:
+        elif isinstance(value, (list, tuple, xrange)):
             array_value = perl.newAV()
-            for i in it:
+            for i in value:
                 perl.av_push(array_value, _new_sv_from_object(i))
             return perl.newRV_noinc(<perl.SV*>array_value)
         else:
