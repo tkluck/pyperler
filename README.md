@@ -1,6 +1,32 @@
 PyPerler
 ========
 
+Quick introduction
+------------------
+PyPerler gives you the power of CPAN, and your (legacy?) perl packages, in
+Python.  Using Perl stuff is as easy as:
+
+    >>> import pyperler; i = pyperler.Interpreter()
+    >>> # use a CPAN module
+    >>> Table = i.use('Text::Table')
+    >>> t = Table("Planet", "Radius\nkm", "Density\ng/cm^3")
+    >>> _ = t.load(
+    ...    [ "Mercury", 2360, 3.7 ],
+    ...    [ "Venus", 6110, 5.1 ],
+    ...    [ "Earth", 6378, 5.52 ],
+    ...    [ "Jupiter", 71030, 1.3 ],
+    ... )
+    >>> for line in t.table(): print line
+    Planet  Radius Density
+            km     g/cm^3 
+    Mercury  2360  3.7    
+    Venus    6110  5.1    
+    Earth    6378  5.52   
+    Jupiter 71030  1.3    
+
+If you install the `Class::Inspector` CPAN package, then PyPerler will even get
+you introspection for use in IPython.
+
 Quick install
 -------------
 
