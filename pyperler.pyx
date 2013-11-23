@@ -376,7 +376,8 @@ class Interpreter(object):
             short_name = name[1:]
             return _sv_new(perl.newRV_inc(<perl.SV*>perl.get_av(short_name, 0)), self)
         elif initial in 'PH': 
-            return LazyHashVariable(self, name[1:])
+            short_name = name[1:]
+            return _sv_new(perl.newRV_inc(<perl.SV*>perl.get_hv(short_name, 0)), self)
         elif initial == 'F':
             if len(name) > 1:
                 return LazyFunctionVariable(self, name[1:])
@@ -550,53 +551,6 @@ cdef class LazyExpression:
         ret._method = name
         ret._interpreter = self._interpreter
         return ret
-
-cdef class LazyHashVariable(LazyExpression):
-    cdef object _name
-    def __init__(self, interpreter, name):
-        self._name = name
-        LazyExpression.__init__(self, interpreter, '%' + name)
-
-    def __getitem__(self, key):
-        cdef perl.SV** scalar_value
-        cdef perl.HV* hash_value
-        key = str(key)
-        hash_value = perl.get_hv(self._name, 0)
-        scalar_value = perl.hv_fetch(hash_value, key, len(key), False)
-        return _sv_new(scalar_value[0], self._interpreter)
-        
-    def __setitem__(self, key, value):
-        cdef perl.HV* hash_value
-        cdef perl.SV** scalar_value
-        hash_value = perl.get_hv(self._name, 0)
-        scalar_value = perl.hv_fetch(hash_value, key, len(key), True)
-        if scalar_value:
-            scalar_value[0] = _new_sv_from_object(value)
-        else:
-            raise IndexError("variable %s does not have ....")
-
-    def __iter__(self):
-        cdef perl.HV* hash_value
-        cdef int i
-        cdef int count
-        cdef char *key
-        cdef int retlen
-        cdef perl.SV *sv
-
-        hash_value = perl.get_hv(self._name, 0)
-        count = perl.hv_iterinit(hash_value)
-        for i in range(count):
-            sv = perl.hv_iternextsv(hash_value, &key, &retlen)
-            yield key, _sv_new(sv, self._interpreter)
-
-    def dict(self):
-        return {key: value for key, value in self}
-
-    def keys(self):
-        return self.dict().keys()
-
-    def values(self):
-        return self.dict().values()
 
 cdef class LazyFunctionVariable(object):
     cdef object _name
@@ -783,6 +737,7 @@ cdef class ScalarValue:
             return _sv_new(scalar_value[0], self._interpreter)
         elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
             hash_value = <perl.HV*>ref_value
+            key = str(key)
             scalar_value = perl.hv_fetch(hash_value, key, len(key), False)
             return _sv_new(scalar_value[0], self._interpreter)
         
@@ -799,6 +754,7 @@ cdef class ScalarValue:
             perl.av_store(array_value, key, _new_sv_from_object(value))
         elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
             hash_value = <perl.HV*>ref_value
+            key = str(key)
             perl.hv_store(hash_value, key, len(key), _new_sv_from_object(value), 0)
 
     def __call__(self, *args, **kwds):
