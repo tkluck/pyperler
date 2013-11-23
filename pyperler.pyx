@@ -366,8 +366,12 @@ class Interpreter(object):
 
     def __getattribute__(self, name):
         initial = name[0].upper()
+        cdef perl.SV *sv
+        cdef perl.AV *array_value
+        cdef perl.HV *hash_value
         if initial in 'SD':
-            return LazyScalarVariable(self, name[1:])
+            short_name = name[1:]
+            return _sv_new(perl.get_sv(short_name, 0), self)
         elif initial == 'A':
             return LazyArrayVariable(self, name[1:])
         elif initial in 'PH': 
@@ -542,30 +546,6 @@ cdef class LazyExpression:
     def __getattr__(self, name):
         ret = BoundMethod()
         ret._sv = self._expression_sv()
-        ret._method = name
-        ret._interpreter = self._interpreter
-        return ret
-
-cdef class LazyScalarVariable(LazyExpression):
-    cdef object _name
-    def __init__(self, interpreter, name):
-        self._name = name
-        LazyExpression.__init__(self, interpreter, '$' + name)
-
-    def __getitem__(self, key):
-        cdef perl.SV** scalar_value
-        return _sv_new(perl.get_sv(self._name, 0), self._interpreter)[key]
-
-    def __setitem__(self, key, value):
-        cdef perl.HV* hash_value
-        _sv_new(perl.get_sv(self._name, 0), self._interpreter)[key] = value
-
-    def __iter__(self):
-        yield self
-
-    def __getattr__(self, name):
-        ret = BoundMethod()
-        ret._sv = perl.SvREFCNT_inc(perl.get_sv(self._name, 0))
         ret._method = name
         ret._interpreter = self._interpreter
         return ret
