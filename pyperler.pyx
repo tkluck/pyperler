@@ -504,22 +504,10 @@ cdef class LazyExpression:
         return iter(self.result(True))
 
     def __str__(self):
-        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
-        self._evaluated = True
-
-        cdef perl.SV *sv = perl.eval_pv(self._expression, True)
-        return perl.SvPVutf8_nolen(sv)
+        return str(self.result(False))
 
     def __int__(self):
-        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
-        self._evaluated = True
-
-        perl.dSP
-        cdef int count = perl.eval_sv(self._expression_sv(), perl.G_SCALAR)
-        perl.SPAGAIN
-        ret = perl.POPl
-        perl.PUTBACK
-        return ret
+        return int(self.result(False))
 
     def __repr__(self):
         return repr(self.result(False))
