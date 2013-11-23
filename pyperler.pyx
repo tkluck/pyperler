@@ -196,7 +196,7 @@ You can also pass Python functions as Perl callbacks:
 4
 
 And this even works if you switch between Perl and Python several times:
->>> i.Fcall_first(i, "2+2")
+>>> i.Fcall_first(i, "2+2") # no lock or segfault
 
 And also when we don't discard the return value:
 >>> def h(x): return int(i[x])
