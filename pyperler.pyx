@@ -403,6 +403,9 @@ class Interpreter(object):
         else:
             return object.__getattribute__(self, name)
 
+    def __dir__(self):
+        return ['use', 'A', 'P', 'H', 'F']
+
     def __setattr__(self, name, value):
         """
         >>> import pyperler; i = pyperler.Interpreter()
