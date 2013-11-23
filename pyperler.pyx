@@ -263,6 +263,8 @@ from cpython.string cimport PyString_AsString
 from cpython cimport PyObject, Py_XINCREF
 cimport perl
 
+include "PythonObjectPm.pyx"
+
 cpdef PERL_SYS_INIT3(argv, env):
     cdef int argc
     cdef char** cargv
@@ -331,7 +333,7 @@ cdef class _PerlInterpreter:
 class Interpreter(object):
     def __init__(self):
         self._interpreter = _PerlInterpreter()
-        self._interpreter.parse(["","-I./perllib","-e","use Python::Object;"])
+        self._interpreter.parse(["","-e",PythonObjectPackage])
         self._interpreter.run()
 
     def __call__(self, code):

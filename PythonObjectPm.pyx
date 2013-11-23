@@ -1,3 +1,4 @@
+cdef object PythonObjectPackage = r"""
 # Copyright 2000-2001 ActiveState
 
 package Python::Object;
@@ -439,3 +440,4 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 =head1 SEE ALSO
 
 L<Python>, L<Python::Err>, L<perlmodule>
+"""
