@@ -256,6 +256,12 @@ We even support introspection if your local CPAN installation sports Class::Insp
 >>> nissan_sunny = Car()
 >>> nissan_sunny.__dir__()
 ['all_brands', 'brand', 'distance', 'drive', 'new', 'out_of_gas', 'set_brand']
+
+Fail gracefully when a variable doesn't exist:
+>>> i.Snon_existing_variable
+Traceback (most recent call last):
+...
+NameError: name '$non_existing_variable' is not defined
 """
 from libc.stdlib cimport malloc, free
 cimport dlfcn
@@ -354,18 +360,30 @@ class Interpreter(object):
         <BLANKLINE>
         """
         initial = name[0].upper()
-        cdef perl.SV *ref_value
+        cdef perl.SV *scalar_value
         cdef perl.AV *array_value
         cdef perl.HV *hash_value
         if initial in 'SD':
             short_name = name[1:]
-            return _sv_new(perl.get_sv(short_name, 0), self)
+            scalar_value = perl.get_sv(short_name, 0)
+            if scalar_value:
+                return _sv_new(scalar_value, self)
+            else:
+                raise NameError("name '$%s' is not defined" % short_name)
         elif initial == 'A':
             short_name = name[1:]
-            return _sv_new(perl.newRV_inc(<perl.SV*>perl.get_av(short_name, 0)), self)
+            array_value = perl.get_av(short_name, 0)
+            if array_value:
+                return _sv_new(perl.newRV_inc(<perl.SV*>array_value), self)
+            else:
+                raise NameError("name '@%s' is not defined" % short_name)
         elif initial in 'PH': 
             short_name = name[1:]
-            return _sv_new(perl.newRV_inc(<perl.SV*>perl.get_hv(short_name, 0)), self)
+            hash_value = perl.get_hv(short_name, 0)
+            if hash_value:
+                return _sv_new(perl.newRV_inc(<perl.SV*>hash_value), self)
+            else:
+                raise NameError("name '%%%s' is not defined" % short_name)
         elif initial == 'F':
             if len(name) > 1:
                 return LazyFunctionVariable(self, name[1:])
@@ -555,10 +573,13 @@ cdef _sv_new(perl.SV *sv, object interpreter):
         if(magic and magic[0].mg_virtual == &virtual_table):
             obj = <object><void*>perl.SvIVX(sv)
             return obj
-    ret = ScalarValue()
-    ret._interpreter = interpreter
-    ret._sv = perl.SvREFCNT_inc(sv)
-    return ret
+    if sv and perl.SvOK(sv):
+        ret = ScalarValue()
+        ret._interpreter = interpreter
+        ret._sv = perl.SvREFCNT_inc(sv)
+        return ret
+    else:
+        return None
 
 cdef int _free(perl.SV* sv, perl.MAGIC* mg):
     obj = <object><void*>perl.SvIVX(sv)
