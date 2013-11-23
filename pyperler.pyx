@@ -333,9 +333,6 @@ cdef class _PerlInterpreter:
     def run(self):
         perl.perl_run(perl.my_perl)
 
-    def eval_pv(self, code, croak_on_error):
-        perl.eval_pv(code, croak_on_error)
-
 class Interpreter(object):
     def __init__(self):
         self._interpreter = _PerlInterpreter()
