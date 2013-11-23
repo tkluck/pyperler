@@ -365,6 +365,16 @@ class Interpreter(object):
         return LazyExpression(self, expression)
 
     def __getattribute__(self, name):
+        """
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i('use Data::Dumper')
+        >>> print i.F['Dumper']({1: 2, 2: 3})
+        $VAR1 = {
+                  '1' => 2,
+                  '2' => 3
+                };
+        <BLANKLINE>
+        """
         initial = name[0].upper()
         cdef perl.SV *ref_value
         cdef perl.AV *array_value
