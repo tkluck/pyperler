@@ -68,13 +68,18 @@ cdef extern from "perl.h":
 
     IV SvIV(SV* scalar_value)
     IV SvIVX(SV* scalar_value)
+    int SvIOK(SV* scalar_value)
     bint SvIV_set(SV* scalar_value, IV value)
     char *SvPVutf8_nolen(SV* scalar_value)
     void SvPV_set(SV* scalar_value, char *value)
     void SvREADONLY(SV* scalar_value)
-    NV SvNV(SV* scalar_value)
     void SvSetSV_nosteal(SV* dsv, SV* ssv)
     void SvSetSV(SV* dsv, SV* ssv)
+
+    NV SvNV(SV* scalar_value)
+    bint SvNV_set(SV* scalar_value, NV value)
+    int SvNOK(SV* scalar_value)
+    void SvNOK_on(SV* scalar_value)
 
     AV *newAV()
     SV **av_fetch(AV* array_value, int key, bint lval)

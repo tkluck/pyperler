@@ -5,9 +5,9 @@ r"""
 Accessing scalar variables:
 >>> i("$a = 2 + 2;")
 >>> i.Sa
-'4'
+4
 >>> i['$a']
-'4'
+4
 >>> list(range(i.Sa))
 [0, 1, 2, 3]
 >>> i.Sa = 5
@@ -15,6 +15,14 @@ Accessing scalar variables:
 [0, 1, 2, 3, 4]
 >>> i['undef']
 None
+
+Integer, float, and string conversions:
+>>> i.Sb = 2.3
+>>> i.Sb
+2.3
+>>> i.Sc = "abc"
+>>> i.Sc
+'abc'
 
 Evaluating list expressions in array context:
 >>> i["qw / a b c d e /"].strings()
@@ -40,16 +48,16 @@ which is also available from Python:
 
 Fun with Perl's secret operators:
 >>> i["()= qw / a b c d e /"]
-'5'
+5
 
 Accessing array values:
 >>> i("@d = (10 .. 20)")
 >>> i.Ad.ints()
 (10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)
 >>> i.Ad[2]
-'12'
+12
 >>> list(i.Ad)[2]
-'12'
+12
 >>> i.Ad[0] = 9
 >>> int(i['$d[0]'])
 9
@@ -79,7 +87,7 @@ Accessing hash values:
 'Kant'
 >>> i.Pparrot = {'dead': True}
 >>> i["$parrot{dead}"]
-'1'
+1
 
 Accessing objects (see below for why we assign to _):
 >>> i("unshift @INC, './perllib'")
@@ -88,7 +96,7 @@ Accessing objects (see below for why we assign to _):
 >>> _ = i.Scar.drive(20)
 >>> del _
 >>> i["$car->distance"]
-'20'
+20
 >>> int(i.Scar.distance())
 20
 
@@ -115,7 +123,7 @@ None
 
 Verify that this makes the intended change to the object:
 >>> i["$car->distance"]
-'40'
+40
 >>> int(i.Scar.distance())
 40
 
@@ -129,9 +137,9 @@ RuntimeError: Out of gas! at perllib/Car.pm line 38.
 Nested structures:
 >>> i("$a = { dictionary => { a => 65, b => 66 }, array => [ 4, 5, 6] }")
 >>> i.Sa['dictionary']['a']
-'65'
+65
 >>> i.Sa['array'][1]
-'5'
+5
 
 Assigning non-string iterables to a nested element will create an arrayref:
 >>> i.Sa['array'] = xrange(2,5)
@@ -148,14 +156,14 @@ Similarly, assiging a dict to a nested element will create a hashref:
 Calling subs:
 >>> i("sub do_something { for (1..10) { 2 + 2 }; return 3; }")
 >>> i.Fdo_something()
-'3'
+3
 >>> i("sub add_two { return $_[0] + 2; }")
 >>> i.Fadd_two("4")
-'6'
+6
 
 Anonymous subs:
 >>> i['sub { return 2*$_[0]; }'](6)
-'12'
+12
 
 In packages:
 >>> i.F['Car::all_brands']().strings()
@@ -169,10 +177,10 @@ list context:
 ...     return on_ready(5)
 ...
 >>> long_computation(i['sub { return 4; }'].scalar_context)
-'4'
+4
 >>> i('sub callback { return $_[0]; }');
 >>> long_computation(i.Fcallback.scalar_context)
-'5'
+5
 
 You can maintain a reference to a Perl object, without it being
 a Perl variable:
@@ -186,7 +194,7 @@ a Perl variable:
 
 >>> i('sub p { return $_[0] ** $_[1]; }')
 >>> i.Fp(2,3)
-'8'
+8.0
 
 But the canonical way is this:
 >>> Car = i.use('Car')
@@ -201,14 +209,14 @@ You can also pass Python functions as Perl callbacks:
 >>> def f(): return 3 
 >>> i('sub callit { return $_[0]->() }')
 >>> i.Fcallit(f)
-'3'
+3
 >>> def g(x): return x**2
 >>> i('sub pass_three { return $_[0]->(3) }')
 >>> i.Fpass_three(g)
-'9'
+9
 >>> i('sub call_first { return $_[0]->($_[1]); }')
 >>> i.Fcall_first(lambda x: eval(str(x)), "2+2")
-'4'
+4
 
 And this even works if you switch between Perl and Python several times:
 >>> #i.Fcall_first(i, "2+2")
@@ -216,7 +224,7 @@ And this even works if you switch between Perl and Python several times:
 And also when we don't discard the return value:
 >>> def h(x): return int(i[x])
 >>> i.Fcall_first(h, "2+2")
-'4'
+4
 
 Test that we recover objects when we pass them through perl
 >>> class FooBar(object):
@@ -255,11 +263,11 @@ Using list context:
 
 Test using more than 32-bits numbers:
 >>> i['sub { shift; }'](2**38)
-'274877906944'
+274877906944
 
 Test using negative numbers:
 >>> i['sub { shift; }'](-1)
-'-1'
+-1
 
 Test passing blessed scalar values through Python:
 >>> i.Sdaewoo_matiz = Car()
@@ -380,6 +388,25 @@ class Interpreter(object):
             return object.__getattribute__(self, name)
 
     def __setattr__(self, name, value):
+        """
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i.Sa = 3
+        >>> i.Sa
+        3
+        >>> i.Sb = 2.3
+        >>> i.Sb
+        2.3
+        >>> i.Aa = [1,2,3]
+        >>> len(i.Aa)
+        3
+        >>> i.Aa[1]
+        2
+        >>> i.Ha = {1:2,2:3}
+        >>> i.Ha.dict()
+        {'1': 2, '2': 3}
+        >>> i.Ha[2]
+        3
+        """
         initial = name[0].upper()
         name = name[1:]
         cdef perl.SV *sv
@@ -397,6 +424,7 @@ class Interpreter(object):
             hash_value = perl.get_hv(name, perl.GV_ADD)
             perl.hv_clear(hash_value)
             for k, v in value.iteritems():
+                k = str(k)
                 perl.hv_store(hash_value, k, len(k), _new_sv_from_object(v), 0)
         else:
             return object.__setattr__(self, initial + name, value)
@@ -497,14 +525,7 @@ cdef class LazyExpression:
         return ret
 
     def __repr__(self):
-        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
-        self._evaluated = True
-
-        cdef perl.SV *sv = perl.eval_pv(self._expression, True)
-        if perl.SvOK(sv):
-            return "'" + perl.SvPVutf8_nolen(sv) + "'"
-        else:
-            return "None"
+        return repr(self.result(False))
 
     def __cmp__(left, right):
         pass
@@ -597,6 +618,7 @@ cdef class LazyHashVariable(LazyExpression):
     def __getitem__(self, key):
         cdef perl.SV** scalar_value
         cdef perl.HV* hash_value
+        key = str(key)
         hash_value = perl.get_hv(self._name, 0)
         scalar_value = perl.hv_fetch(hash_value, key, len(key), False)
         return _sv_new(scalar_value[0], self._interpreter)
@@ -731,9 +753,9 @@ cdef _assign_sv(perl.SV *sv, object value):
     if value is None:
         sv = &perl.PL_sv_undef
     elif isinstance(value, int):
-        perl.SvIV_set(sv, <perl.IV><unsigned long>value)
-    elif isinstance(value, str):
-        perl.SvPV_set(sv, value)
+        perl.SvSetSV(sv, perl.newSViv(value))
+    elif isinstance(value, float):
+        perl.SvSetSV(sv, perl.newSVnv(value))
     elif isinstance(value, ScalarValue):
         perl.SvSetSV_nosteal(sv, (<ScalarValue>value)._sv)
     else:
@@ -760,7 +782,12 @@ cdef class ScalarValue:
 
     def __repr__(self):
         if perl.SvOK(self._sv):
-            return "'" + str(self) + "'"
+            if perl.SvIOK(self._sv):
+                return repr(int(self))
+            if perl.SvNOK(self._sv):
+                return repr(float(self))
+            else:
+                return repr(str(self))
         else:
             return 'None'
 
@@ -851,7 +878,7 @@ cdef class ScalarValue:
         """
             >>> import pyperler; i = pyperler.Interpreter()
             >>> i['{a => 1, b => 2}'].result(False).dict()
-            {'a': '1', 'b': '2'}
+            {'a': 1, 'b': 2}
         """
         return {key: value for key, value in self}
 
