@@ -166,7 +166,7 @@ Anonymous subs:
 12
 
 In packages:
->>> i.F['Car::all_brands']().strings()
+>>> i.F['Car::all_brands']()
 ('Toyota', 'Nissan')
 
 Passing a Perl function as a callback to python. You'll need to
@@ -235,7 +235,7 @@ Test that we recover objects when we pass them through perl
 >>> foobar = FooBar()
 >>> type(foobar)
 <class 'pyperler.FooBar'>
->>> type(i.Fshifter(FooBar()).result(False))
+>>> type(i.Fshifter(FooBar()))
 <class 'pyperler.FooBar'>
 
 >>> Table = i.use('Text::Table')
@@ -247,7 +247,7 @@ Test that we recover objects when we pass them through perl
 ...    [ "Jupiter", 71030, 1.3 ],
 ... )
 >>> del _
->>> print str(t.table())
+>>> print t.table.scalar_context()
 Planet  Radius Density
         km     g/cm^3 
 Mercury  2360  3.7    
@@ -461,7 +461,7 @@ cdef class PerlPackage:
         bound_method._method = "new"
         bound_method._sv = _new_sv_from_object(str(self._name))
         bound_method._interpreter = self._interpreter
-        return bound_method(*args, **kwds).result(False)
+        return bound_method(*args, **kwds)
 
     def __getattr__(self, name):
         cdef BoundMethod bound_method = BoundMethod()
@@ -473,7 +473,7 @@ cdef class PerlPackage:
     def __dir__(self):
         try:
             Inspector = self._interpreter.use('Class::Inspector')
-            return [str(method) for method in Inspector.methods(self._name).result(False)]
+            return [str(method) for method in Inspector.methods(self._name)]
         except (ImportError, TypeError):
             return []
 
@@ -550,10 +550,10 @@ cdef class LazyExpression:
         pass
 
     def scalar_context(self, *args, **kwds):
-        return self(*args, **kwds).result(False)
+        return self.result(False).scalar_context(*args, **kwds)
 
     def list_context(self, *args, **kwds):
-        return self(*args, **kwds).result(True)
+        return self.result(False).list_context(*args, **kwds)
 
     def __getattr__(self, name):
         ret = BoundMethod()
@@ -570,13 +570,13 @@ cdef class LazyFunctionVariable(object):
         self._interpreter = interpreter
 
     def __call__(self, *args, **kwds):
-        return LazyCalledSub_new(self._name, None, self._interpreter, <perl.SV*>0, <perl.SV*>0, args, kwds)
+        return CalledSub_new(self._name, None, self._interpreter, <perl.SV*>0, <perl.SV*>0, args, kwds)
 
     def scalar_context(self, *args, **kwds):
-        return self(*args, **kwds).result(False)
+        return LazyCalledSub_new(self._name, None, self._interpreter, <perl.SV*>0, <perl.SV*>0, args, kwds).result(False)
 
     def list_context(self, *args, **kwds):
-        return self(*args, **kwds).result(True)
+        return LazyCalledSub_new(self._name, None, self._interpreter, <perl.SV*>0, <perl.SV*>0, args, kwds).result(True)
 
 cdef _sv_new(perl.SV *sv, object interpreter):
     cdef perl.MAGIC* magic
@@ -763,7 +763,13 @@ cdef class ScalarValue:
             perl.hv_store(hash_value, key, len(key), _new_sv_from_object(value), 0)
 
     def __call__(self, *args, **kwds):
-        return LazyCalledSub_new(None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds)
+        return CalledSub_new(None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds)
+
+    def scalar_context(self, *args, **kwds):
+        return LazyCalledSub_new(None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds).result(False)
+
+    def list_context(self, *args, **kwds):
+        return LazyCalledSub_new(None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds).result(True)
 
     def __getattr__(self, name):
         ret = BoundMethod()
@@ -796,7 +802,7 @@ cdef class ScalarValue:
         try:
             Inspector = self._interpreter.use('Class::Inspector')
             classname = str(self._interpreter['sub { ref $_[0]; }'](self))
-            return [str(method) for method in Inspector.methods(classname).result(False)]
+            return [str(method) for method in Inspector.methods(classname)]
         except (ImportError, TypeError):
             return []
         
@@ -807,18 +813,25 @@ cdef class BoundMethod:
     cdef object _interpreter
 
     def __call__(self, *args, **kwds):
-        return LazyCalledSub_new(None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds)
+        return CalledSub_new(None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds)
     
     def __dealloc__(self):
         perl.SvREFCNT_dec(self._sv)
 
     def scalar_context(self, *args, **kwds):
-        return self(*args, **kwds).result(False)
+        return LazyCalledSub_new(None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds).result(False)
 
     def list_context(self, *args, **kwds):
-        return self(*args, **kwds).result(True)
+        return LazyCalledSub_new(None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds).result(True)
 
-cdef LazyCalledSub LazyCalledSub_new(object name, object method, object interpreter, perl.SV* scalar_value, perl.SV* self, object args, object kwds):
+cdef object CalledSub_new(object name, object method, object interpreter, perl.SV* scalar_value, perl.SV* self, object args, object kwds):
+    cdef LazyCalledSub ret = LazyCalledSub_new(name, method, interpreter, scalar_value, self, args, kwds)
+    result = ret.result(True)
+    if len(result) == 1:
+        return result[0]
+    return result
+
+cdef object LazyCalledSub_new(object name, object method, object interpreter, perl.SV* scalar_value, perl.SV* self, object args, object kwds):
     cdef LazyCalledSub ret = LazyCalledSub()
     ret._name = name
     ret._method = method
@@ -876,7 +889,7 @@ cdef class LazyCalledSub:
             if perl.SvTRUE(perl.ERRSV):
                 raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
             if list_context:
-                return ret
+                return tuple(ret)
             else:
                 return ret[0]
         finally:
