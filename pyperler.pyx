@@ -89,37 +89,16 @@ Accessing hash values:
 >>> i["$parrot{dead}"]
 1
 
-Accessing objects (see below for why we assign to _):
+Accessing objects (we assign to _ to discard the meaningless return values):
 >>> i("unshift @INC, './perllib'")
 >>> i("use Car; $car = Car->new")
 >>> _ = i.Scar.set_brand("Toyota")
 >>> _ = i.Scar.drive(20)
->>> del _
 >>> i["$car->distance"]
 20
 >>> int(i.Scar.distance())
 20
-
-About the assignments to _: If we do not use the return value, then
-we do not know whether the method should be called in scalar or in array
-context. For that reason, we defer evaluation until the return value is actually
-used.
-
-This works as follows. The method call `i.Scar.set_brand("Toyota")` returns a
-`pyperler.LazyEvaluation` object. You can use this object in several ways: if
-you cast it to an int or str, or use its representation, it will be called in
-scalar context. If you iterate over it, or call one of the strings() or ints()
-methods, it will be called in array context. If you don't use it at all, it
-will be called upon garbage collection of the object. Because CPython uses a
-reference counting system, this garbage collection is always immediate if you
-do not use the return value. This means that 'normal' Python code would not
-have to use this trick. In the doctesting framework, however, or in IPython,
-references are kept to previous return values. Our trick with _ makes sure that
-the returned objects are garbage collected immediately.
-
-Alternatively, we can let the methods be called as a result of the `repr` call:
 >>> i.Scar.drive(20)
-None
 
 Verify that this makes the intended change to the object:
 >>> i["$car->distance"]
@@ -187,7 +166,6 @@ a Perl variable:
 >>> car = i['Car->new'].result(False)
 >>> _ = car.set_brand('Chevrolet')
 >>> _ = car.drive(20)
->>> del _
 >>> car.brand()
 'Chevrolet'
 >>> del car   # this deletes it on the Perl side, too
@@ -201,7 +179,6 @@ But the canonical way is this:
 >>> car = Car()
 >>> _ = car.drive(20)
 >>> _ = car.set_brand('Honda')
->>> del _
 >>> car.brand()
 'Honda'
 
@@ -246,7 +223,6 @@ Test that we recover objects when we pass them through perl
 ...    [ "Earth", 6378, 5.52 ],
 ...    [ "Jupiter", 71030, 1.3 ],
 ... )
->>> del _
 >>> print t.table.scalar_context()
 Planet  Radius Density
         km     g/cm^3 
@@ -695,6 +671,9 @@ cdef class ScalarValue:
         else:
             return 'None'
 
+    def is_defined(self):
+        return perl.SvOK(self._sv)
+
     def __len__(self):
         cdef perl.AV* array_value
         cdef perl.SV* ref_value
@@ -831,7 +810,10 @@ cdef object CalledSub_new(object name, object method, object interpreter, perl.S
     cdef LazyCalledSub ret = LazyCalledSub_new(name, method, interpreter, scalar_value, self, args, kwds)
     result = ret.result(True)
     if len(result) == 1:
-        return result[0]
+        result = result[0]
+        if isinstance(result, ScalarValue) and not result.is_defined():
+            return None
+        return result
     return result
 
 cdef object LazyCalledSub_new(object name, object method, object interpreter, perl.SV* scalar_value, perl.SV* self, object args, object kwds):
