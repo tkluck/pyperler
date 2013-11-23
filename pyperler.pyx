@@ -620,7 +620,6 @@ cdef perl.SV *_new_sv_from_object(object value):
     cdef perl.MAGIC* magic
 
     try:
-        it = iter_or_none(value)
         if isinstance(value, int):
             return perl.newSViv(value)
         elif isinstance(value, float):
@@ -635,7 +634,8 @@ cdef perl.SV *_new_sv_from_object(object value):
             return perl.newRV_noinc(<perl.SV*>hash_value)
         elif isinstance(value, ScalarValue):
             return perl.SvREFCNT_inc((<ScalarValue>value)._sv)
-        elif it: 
+        it = iter_or_none(value)
+        if it:
             array_value = perl.newAV()
             for i in it:
                 perl.av_push(array_value, _new_sv_from_object(i))
