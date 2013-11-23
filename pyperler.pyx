@@ -570,12 +570,7 @@ cdef class LazyFunctionVariable(object):
         self._interpreter = interpreter
 
     def __call__(self, *args, **kwds):
-        ret = LazyCalledSub()
-        ret._name = self._name
-        ret._args = args;
-        ret._kwds = kwds;
-        ret._interpreter = self._interpreter
-        return ret
+        return LazyCalledSub_new(self._name, None, self._interpreter, <perl.SV*>0, <perl.SV*>0, args, kwds)
 
     def scalar_context(self, *args, **kwds):
         return self(*args, **kwds).result(False)
@@ -768,12 +763,7 @@ cdef class ScalarValue:
             perl.hv_store(hash_value, key, len(key), _new_sv_from_object(value), 0)
 
     def __call__(self, *args, **kwds):
-        ret = LazyCalledSub()
-        ret._sv = perl.SvREFCNT_inc(self._sv)
-        ret._args = args
-        ret._kwds = kwds
-        ret._interpreter = self._interpreter
-        return ret
+        return LazyCalledSub_new(None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds)
 
     def __getattr__(self, name):
         ret = BoundMethod()
@@ -817,13 +807,7 @@ cdef class BoundMethod:
     cdef object _interpreter
 
     def __call__(self, *args, **kwds):
-        ret = LazyCalledSub()
-        ret._self = perl.SvREFCNT_inc(self._sv)
-        ret._method = self._method
-        ret._args = args
-        ret._kwds = kwds
-        ret._interpreter = self._interpreter
-        return ret
+        return LazyCalledSub_new(None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds)
     
     def __dealloc__(self):
         perl.SvREFCNT_dec(self._sv)
@@ -833,6 +817,17 @@ cdef class BoundMethod:
 
     def list_context(self, *args, **kwds):
         return self(*args, **kwds).result(True)
+
+cdef LazyCalledSub LazyCalledSub_new(object name, object method, object interpreter, perl.SV* scalar_value, perl.SV* self, object args, object kwds):
+    cdef LazyCalledSub ret = LazyCalledSub()
+    ret._name = name
+    ret._method = method
+    ret._interpreter = interpreter
+    ret._sv = perl.SvREFCNT_inc(scalar_value)
+    ret._self = perl.SvREFCNT_inc(self)
+    ret._args = args
+    ret._kwds = kwds
+    return ret
 
 cdef class LazyCalledSub:
     cdef object _name
@@ -912,6 +907,7 @@ cdef class LazyCalledSub:
         if not self._evaluated:
             self.result(False)
         perl.SvREFCNT_dec(self._self)
+        perl.SvREFCNT_dec(self._sv)
 
     def __add__(self, other):
         return int(self) + other
