@@ -282,6 +282,11 @@ Traceback (most recent call last):
 ...
 NameError: name '$non_existing_variable' is not defined
 
+Use Perl's awesome interface to regular expressions for shorter code:
+>>> i.S_ = "abc"
+>>> a,b,c = i['/(.)(.)(.)/']
+>>> a,b,c
+('a', 'b', 'c')
 """
 from libc.stdlib cimport malloc, free
 cimport dlfcn
