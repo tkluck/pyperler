@@ -129,6 +129,33 @@ cdef void object_set_item(perl.CV* p1, perl.CV* p2):
         exctype, value = sys.exc_info()[:2]
         perl.croak(value.message)
 
+cdef void object_del_item(perl.CV* p1, perl.CV* p2):
+    perl.dSP
+    perl.dMARK
+    perl.dAX
+    perl.dITEMS
+
+    cdef void* obj_ptr
+
+    if perl.items != 2:
+        perl.croak("Should call object_del_item with two arguments")
+        perl.XSRETURN(0)
+
+    try:
+        args = [_sv_new(perl.stack[i], None) for i in xrange(1, perl.items)]
+        obj_ptr = <void*>perl.SvIVX(perl.SvRV(perl.stack[0]))
+        if obj_ptr:
+            obj = <object>obj_ptr
+            del obj[args[0]]
+            ret = None
+            perl.stack[0] = perl.sv_2mortal(_new_sv_from_object(ret))
+            perl.XSRETURN(1)
+        else:
+            raise RuntimeError("Not a python object")
+    except:
+        exctype, value = sys.exc_info()[:2]
+        perl.croak(value.message)
+
 
 cdef void object_length(perl.CV* p1, perl.CV* p2):
     perl.dSP

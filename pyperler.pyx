@@ -313,6 +313,7 @@ cdef void xs_init():
     perl.newXS("Python::PyObject_SetItem", &object_set_item, file)
     perl.newXS("Python::PyObject_Length", &object_length, file)
     perl.newXS("Python::PyMapping_Check", &object_is_mapping, file)
+    perl.newXS("Python::PyObject_DelItem", &object_del_item, file)
 
 cdef class _PerlInterpreter:
     cdef perl.PerlInterpreter *_this
