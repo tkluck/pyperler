@@ -205,8 +205,18 @@ And also when we don't discard the return value:
 
 Test that we recover objects when we pass them through perl
 >>> class FooBar(object):
+...    def __init__(self):
+...       self._last_set_item = None
 ...    def foo(self):
 ...       return "bar"
+...    def __getitem__(self, key):
+...         return 'key: %s' % key
+...    def __setitem__(self, key, value):
+...         self._last_set_item = value
+...    def __len__(self):
+...         return 31337
+...    def __bool__(self):
+...         return bool(self._last_set_item)
 ...
 >>> i('sub shifter { shift; }')
 >>> foobar = FooBar()
@@ -214,6 +224,15 @@ Test that we recover objects when we pass them through perl
 <class 'pyperler.FooBar'>
 >>> type(i.Fshifter(FooBar()))
 <class 'pyperler.FooBar'>
+
+And that indexing and getting the length works:
+>>> i['sub { return $_[0]->{miss}; }'](foobar)
+'key: miss'
+>>> i['sub { $_[0]->{funny_joke} = "dkfjasd"; return undef; }'](foobar)
+>>> i['sub { return $_[0] ? "YES" : "no"; }'](foobar)
+'YES'
+>>> i['sub { return scalar@{ $_[0] }; }'](foobar)
+31337
 
 >>> Table = i.use('Text::Table')
 >>> t = Table("Planet", "Radius\nkm", "Density\ng/cm^3")
@@ -262,6 +281,7 @@ Fail gracefully when a variable doesn't exist:
 Traceback (most recent call last):
 ...
 NameError: name '$non_existing_variable' is not defined
+
 """
 from libc.stdlib cimport malloc, free
 cimport dlfcn
@@ -277,43 +297,22 @@ cpdef PERL_SYS_INIT3(argv, env):
     cdef char** cenv
     perl.PERL_SYS_INIT3(&argc, &cargv, &cenv)
 
-cdef void call_object(perl.CV* p1, perl.CV* p2):
-    perl.dSP
-    perl.dMARK
-    perl.dAX
-    perl.dITEMS
-
-    cdef void* obj_ptr
-
-    if perl.items < 1:
-        perl.croak("Cannot use call_object without a Python object")
-        perl.XSRETURN(0)
-
-    try:
-        args = [_sv_new(perl.stack[i], None) for i in xrange(1, perl.items)]
-        obj_ptr = <void*>perl.SvIVX(perl.SvRV(perl.stack[0]))
-        if obj_ptr:
-            obj = <object>obj_ptr
-            ret = obj(*args)
-            perl.stack[0] = perl.sv_2mortal(_new_sv_from_object(ret))
-            perl.XSRETURN(1)
-        else:
-            raise RuntimeError("Not a python object")
-    except:
-        exctype, value = sys.exc_info()[:2]
-        perl.croak(value.message)
-
-cdef void dummy(perl.CV* p1, perl.CV* p2):
-    return
+include "callbacks.pyx"
 
 cdef void xs_init():
     cdef char *file = "file"
 
     perl.newXS("DynaLoader::boot_DynaLoader", &perl.boot_DynaLoader, file);
-    perl.newXS("Python::PyObject_CallObject", <void*>&call_object, file)
     perl.newXS("Python::bootstrap", &dummy, file)
     perl.newXS("Python::Object::bootstrap", &dummy, file)
-    perl.newXS("Python::PyObject_Str", &dummy, file)
+
+    perl.newXS("Python::PyObject_CallObject", <void*>&call_object, file)
+    perl.newXS("Python::PyObject_Str", &object_to_str, file)
+    perl.newXS("Python::PyObject_IsTrue", &object_to_bool, file)
+    perl.newXS("Python::PyObject_GetItem", &object_get_item, file)
+    perl.newXS("Python::PyObject_SetItem", &object_set_item, file)
+    perl.newXS("Python::PyObject_Length", &object_length, file)
+    perl.newXS("Python::PyMapping_Check", &object_is_mapping, file)
 
 cdef class _PerlInterpreter:
     cdef perl.PerlInterpreter *_this
@@ -602,6 +601,11 @@ cdef perl.SV *_new_sv_from_object(object value):
             return perl.newSVnv(value)
         elif isinstance(value, str):
             return perl.newSVpvn_utf8(value, len(value), True)
+        elif isinstance(value, bool):
+            if value:
+                return perl.newSViv(1)
+            else:
+                return perl.newSVpvn_utf8('', 0, True)
         elif isinstance(value, dict):
             hash_value = perl.newHV()
             for k, v in value.iteritems():
