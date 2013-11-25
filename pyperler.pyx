@@ -807,7 +807,7 @@ cdef class ScalarValue:
             return []
         
 
-cdef class BoundMethod:
+cdef class BoundMethod(object):
     cdef perl.SV *_sv
     cdef object _method
     cdef object _interpreter
@@ -823,6 +823,35 @@ cdef class BoundMethod:
 
     def list_context(self, *args, **kwds):
         return LazyCalledSub_new(None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds).result(True)
+
+    def __getattribute__(self, name):
+        if name == '__doc__':
+            return self._docstring(self._method)
+        return object.__getattribute__(self, name)
+
+    def _docstring(self, name):
+        try:
+            Inspector = self._interpreter.use('Class::Inspector')
+            classname = str(self._interpreter['sub { ref $_[0] || $_[0]; }'](_sv_new(self._sv, self._interpreter)))
+            filename = str(Inspector.loaded_filename(classname))
+            result = """Documentation for method %s in package %s
+
+Here's the first few lines of this method, which hopefully give you a clue
+about it's signature:
+
+""" % (name, classname)
+            number_of_lines = 0
+            for line in open(filename):
+                if ('sub ' + self._method) in line:
+                    number_of_lines = 10
+                if number_of_lines:
+                    result += line
+                    number_of_lines -= 1
+                    if not number_of_lines:
+                        break
+            return result
+        except ImportError:
+            return "No docstring available; install Class::Inspector"
 
 cdef object CalledSub_new(object name, object method, object interpreter, perl.SV* scalar_value, perl.SV* self, object args, object kwds):
     cdef LazyCalledSub ret = LazyCalledSub_new(name, method, interpreter, scalar_value, self, args, kwds)
