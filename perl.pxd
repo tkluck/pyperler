@@ -71,6 +71,7 @@ cdef extern from "perl.h":
     int SvIOK(SV* scalar_value)
     bint SvIV_set(SV* scalar_value, IV value)
     char *SvPVutf8_nolen(SV* scalar_value)
+    char *SvPV_nolen(SV* scalar_value)
     void SvPV_set(SV* scalar_value, char *value)
     void SvREADONLY(SV* scalar_value)
     void SvSetSV_nosteal(SV* dsv, SV* ssv)

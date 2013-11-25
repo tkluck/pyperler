@@ -660,7 +660,7 @@ cdef class ScalarValue:
         perl.SvREFCNT_dec(self._sv)
 
     def __str__(self):
-        return perl.SvPVutf8_nolen(self._sv)
+        return perl.SvPV_nolen(self._sv)
 
     def __int__(self):
         return <long>perl.SvIV(self._sv)
@@ -672,7 +672,14 @@ cdef class ScalarValue:
         return int(self)**e
 
     def __repr__(self):
+        cdef perl.SV* ref_value
         if perl.SvOK(self._sv):
+            if perl.SvROK(self._sv):
+                ref_value = perl.SvRV(self._sv)
+                if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
+                    return repr(list(self))
+                else:
+                    return repr(self.dict())
             if perl.SvIOK(self._sv):
                 return repr(int(self))
             if perl.SvNOK(self._sv):
