@@ -707,6 +707,27 @@ cdef class ScalarValue:
         else:
             raise TypeError("not an array ref")
 
+    def __nonzero__(self):
+        """
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> bool(i['12'].result(False))
+        True
+        >>> bool(i['""'].result(False))
+        False
+        >>> i('@array = ()')
+        >>> bool(i.Aarray)
+        False
+        """
+        cdef perl.SV* ref_value
+        if not perl.SvROK(self._sv):
+            return perl.SvTRUE(self._sv)
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
+            return len(self) > 0
+        elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
+            # FIXME: we shouldn't allocate the keys list here
+            return len(self.keys()) > 0
+
     def __iter__(self):
         cdef perl.SV** scalar_value
         cdef perl.AV* array_value
