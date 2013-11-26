@@ -717,6 +717,9 @@ cdef class ScalarValue:
         >>> i('@array = ()')
         >>> bool(i.Aarray)
         False
+        >>> i.Aarray = [1, 2, 3]
+        >>> bool(i.Aarray)
+        True
         """
         cdef perl.SV* ref_value
         if not perl.SvROK(self._sv):
@@ -727,6 +730,95 @@ cdef class ScalarValue:
         elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
             # FIXME: we shouldn't allocate the keys list here
             return len(self.keys()) > 0
+
+    def __hash__(self):
+        return int(<long>self._sv)
+
+    def __add__(x, y):
+        """
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i.Sa = 3
+        >>> i.Sa + 3
+        6
+        >>> i.Sa + " beers please"
+        '3 beers please'
+        >>> 'My favourite number is ' + i.Sa
+        'My favourite number is 3'
+        >>> 8 + i.Sa
+        11
+        >>> i.Sb = [1,2,3]
+        >>> i.Sb + [4, 5]
+        [1, 2, 3, 4, 5]
+        >>> [0] + i.Sb
+        [0, 1, 2, 3]
+        """
+
+        if isinstance(y, str):
+            return str(x) + y
+        if isinstance(x, str):
+            return x + str(y)
+        if isinstance(y, (list, tuple, xrange)) or isinstance(x, (list, tuple, xrange)):
+            return list(x) + list(y)
+        if not isinstance(x, ScalarValue):
+            x, y = y, x
+        if isinstance(y, (int, float)):
+            if perl.SvIOK((<ScalarValue>x)._sv):
+                return int(x) + y
+            if perl.SvNOK((<ScalarValue>x)._sv):
+                return float(x) + y
+        if isinstance(y, ScalarValue):
+            raise RuntimeError("Cannot use + operator on two perl scalar values '%s' and '%s'. Convert either one to string or to integer" % (x, y))
+        raise NotImplementedError()
+
+    def __sub__(x, y):
+        """
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i.Sa = 3
+        >>> i.Sa - 2
+        1
+        >>> i.Sa - 5
+        -2
+        >>> 8 - i.Sa
+        5
+        """
+        sign = 1
+        if not isinstance(x, ScalarValue):
+            x, y = y, x
+            sign = -1
+        if isinstance(y, (int, float)):
+            if perl.SvIOK((<ScalarValue>x)._sv):
+                return sign*(int(x) - y)
+            if perl.SvNOK((<ScalarValue>x)._sv):
+                return sign*(float(x) - y)
+        if isinstance(y, ScalarValue):
+            if perl.SvIOK((<ScalarValue>x)._sv) and perl.SvIOK((<ScalarValue>x)._sv):
+                return sign*(int(x) - int(y))
+            else:
+                return sign*(float(x) - float(y))
+        raise NotImplementedError()
+
+    def __mul__(x, y):
+        """
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i.Sa = 3
+        >>> i.Sa * 3
+        9
+        >>> 8 * i.Sa
+        24
+        """
+        if not isinstance(x, ScalarValue):
+            x, y = y, x
+        if isinstance(y, (int, float)):
+            if perl.SvIOK((<ScalarValue>x)._sv):
+                return int(x) * y
+            if perl.SvNOK((<ScalarValue>x)._sv):
+                return float(x) * y
+        if isinstance(y, ScalarValue):
+            if perl.SvIOK((<ScalarValue>x)._sv) and perl.SvIOK((<ScalarValue>x)._sv):
+                return int(x) * int(y)
+            else:
+                return float(x) * float(y)
+        raise NotImplementedError()
 
     def __iter__(self):
         cdef perl.SV** scalar_value
