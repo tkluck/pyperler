@@ -868,12 +868,18 @@ cdef class ScalarValue:
         if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
             array_value = <perl.AV*>ref_value
             scalar_value = perl.av_fetch(array_value, key, False)
-            return _sv_new(scalar_value[0], self._interpreter)
+            if scalar_value:
+                return _sv_new(scalar_value[0], self._interpreter)
+            else:
+                raise IndexError(key)
         elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
             hash_value = <perl.HV*>ref_value
             key = str(key)
             scalar_value = perl.hv_fetch(hash_value, key, len(key), False)
-            return _sv_new(scalar_value[0], self._interpreter)
+            if scalar_value:
+                return _sv_new(scalar_value[0], self._interpreter)
+            else:
+                raise KeyError(key)
         
     def __setitem__(self, key, value):
         cdef perl.SV** scalar_value
