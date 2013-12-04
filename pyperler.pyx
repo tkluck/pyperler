@@ -806,23 +806,70 @@ cdef class ScalarValue:
         >>> 8 * i.Sa
         24
         """
-        if not isinstance(x, ScalarValue):
-            x, y = y, x
+        if isinstance(y, ScalarValue):
+            if perl.SvIOK((<ScalarValue>y)._sv):
+                return x * int(y)
+            if perl.SvNOK((<ScalarValue>x)._sv):
+                return x * float(y)
         if isinstance(y, (int, float)):
             if perl.SvIOK((<ScalarValue>x)._sv):
                 return int(x) * y
             if perl.SvNOK((<ScalarValue>x)._sv):
                 return float(x) * y
-        if isinstance(y, ScalarValue):
-            if perl.SvIOK((<ScalarValue>x)._sv) and perl.SvIOK((<ScalarValue>x)._sv):
-                return int(x) * int(y)
-            else:
-                return float(x) * float(y)
         raise NotImplementedError()
 
-    #def __div__(x, y):
-    #def __floordiv__(x, y):
-    #def __truediv__(x, y):
+    def __div__(x, y):
+        return x.__floordiv__(y)
+
+    def __floordiv__(x, y):
+        """
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i.Sa = 3
+        >>> i.Sa / 3
+        1
+        >>> #8 / i.Sa
+        2
+        >>> i.Sb = 10
+        >>> i.Sb / i.Sa
+        3
+        """
+        if isinstance(y, ScalarValue):
+            if perl.SvIOK((<ScalarValue>y)._sv):
+                return x / int(y)
+            if perl.SvNOK((<ScalarValue>y)._sv):
+                return x / float(y)
+        if isinstance(y, (int, float)):
+            if perl.SvIOK((<ScalarValue>x)._sv):
+                return int(x) / y
+            if perl.SvNOK((<ScalarValue>x)._sv):
+                return float(x) / y
+        raise NotImplementedError()
+
+    def __truediv__(x, y):
+        """
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> from operator import truediv
+        >>> i.Sa = 3
+        >>> truediv(i.Sa, 3)
+        1.0
+        >>> truediv(8, i.Sa)
+        2.6666666666666665
+        >>> i.Sb = 10
+        >>> truediv(i.Sb, i.Sa)
+        3.3333333333333335
+        """
+        from operator import truediv
+        if isinstance(y, ScalarValue):
+            if perl.SvIOK((<ScalarValue>y)._sv):
+                return truediv(x, int(y))
+            if perl.SvNOK((<ScalarValue>y)._sv):
+                return truediv(x, float(y))
+        if isinstance(y, (int, float)):
+            if perl.SvIOK((<ScalarValue>x)._sv):
+                return truediv(int(x), y)
+            if perl.SvNOK((<ScalarValue>x)._sv):
+                return truediv(float(x) / y)
+        raise NotImplementedError()
     #def __mod__(x, y):
     #def __divmod__(x, y):
     #def __pow__(x, y, z):
