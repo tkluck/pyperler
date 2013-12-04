@@ -972,7 +972,7 @@ cdef class BoundMethod(object):
             result = """Documentation for method %s in package %s
 
 Here's the first few lines of this method, which hopefully give you a clue
-about it's signature:
+about its signature:
 
 """ % (name, classname)
             number_of_lines = 0
