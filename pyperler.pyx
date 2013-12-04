@@ -820,6 +820,22 @@ cdef class ScalarValue:
                 return float(x) * float(y)
         raise NotImplementedError()
 
+    #def __div__(x, y):
+    #def __floordiv__(x, y):
+    #def __truediv__(x, y):
+    #def __mod__(x, y):
+    #def __divmod__(x, y):
+    #def __pow__(x, y, z):
+    #def __neg__(self):
+    #def __pos__(self):
+    #def __abs__(self):
+    #def __invert__(x, y):
+    #def __lshift__(x, y):
+    #def __rshift__(x, y):
+    #def __and__(x, y):
+    #def __or__(x, y):
+    #def __xor__(x, y):
+
     def __iter__(self):
         cdef perl.SV** scalar_value
         cdef perl.AV* array_value
