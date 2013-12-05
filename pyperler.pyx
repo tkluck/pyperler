@@ -1,3 +1,4 @@
+# vim: set fileencoding=utf-8 :
 r"""
 >>> import pyperler
 >>> i = pyperler.Interpreter()
@@ -660,7 +661,23 @@ cdef class ScalarValue:
         perl.SvREFCNT_dec(self._sv)
 
     def __str__(self):
-        return perl.SvPV_nolen(self._sv)
+        u"""
+        Do some checks about copying the string, and accurate refcounting:
+
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i.Sa = "abc" + str(type(i))   # i.Sa is assigned a temporary string object
+        >>> i.Sa
+        "abc<class 'pyperler.Interpreter'>"
+        >>> text = str(i.Sa)
+        >>> i.Sa = "def"
+        >>> text[:3]
+        'abc'
+        >>> i.Sa
+        'def'
+        """
+        cdef int length = 0
+        cdef char *perl_string = perl.SvPVutf8(self._sv, length)
+        return perl_string[:length]
 
     def __int__(self):
         return <long>perl.SvIV(self._sv)
