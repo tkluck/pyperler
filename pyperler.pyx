@@ -805,17 +805,26 @@ cdef class ScalarValue:
         9
         >>> 8 * i.Sa
         24
+        >>> i.Aa = [1,2,3]
+        >>> i.Aa * 3
+        [1, 2, 3, 1, 2, 3, 1, 2, 3]
+        >>> 3 * i.Aa
+        [1, 2, 3, 1, 2, 3, 1, 2, 3]
         """
         if isinstance(y, ScalarValue):
             if perl.SvIOK((<ScalarValue>y)._sv):
                 return x * int(y)
-            if perl.SvNOK((<ScalarValue>x)._sv):
+            if perl.SvNOK((<ScalarValue>y)._sv):
                 return x * float(y)
+            if perl.SvROK((<ScalarValue>y)._sv):
+                return x * list(y)
         if isinstance(y, (int, float)):
             if perl.SvIOK((<ScalarValue>x)._sv):
                 return int(x) * y
             if perl.SvNOK((<ScalarValue>x)._sv):
                 return float(x) * y
+            if perl.SvROK((<ScalarValue>x)._sv):
+                return list(x) * y
         raise NotImplementedError()
 
     def __div__(x, y):
