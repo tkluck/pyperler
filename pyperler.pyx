@@ -1041,8 +1041,8 @@ about its signature:
                     if not number_of_lines:
                         break
             return result
-        except ImportError:
-            return "No docstring available; install Class::Inspector"
+        except (ImportError, IOError):
+            return "No docstring available; either Class::Inspector is not installed or the source file could not be read"
 
 cdef object CalledSub_new(object name, object method, object interpreter, perl.SV* scalar_value, perl.SV* self, object args, object kwds):
     cdef LazyCalledSub ret = LazyCalledSub_new(name, method, interpreter, scalar_value, self, args, kwds)
