@@ -75,9 +75,12 @@ doctests for more examples.
 
 License
 -------
-PyPerler is released under the General Public License, version 3 or later.
-Refer to the file COPYING for the licensing conditions.
+PyPerler is Copyright (C) 2013, Timo Kluck. It is distributed under the General
+Public License, version 3 or later.
 
+The file PythonObject.pm contains code from from PyPerl, which is Copyright
+2000-2001 ActiveState. This code can be distributed under the same terms as
+Perl, which includes distribution under the GPL version 1 or later.
 
-
-Copyright (C) 2013, Timo Kluck
+For your convenience, the General Public License version 3 is included as the
+file COPYING.
