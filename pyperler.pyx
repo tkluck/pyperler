@@ -908,6 +908,61 @@ cdef class ScalarValue:
     #def __and__(x, y):
     #def __or__(x, y):
     #def __xor__(x, y):
+    def __richcmp__(x, y, operation):
+        r"""
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i.Sa = 3
+        >>> i.Sb = 3
+        >>> i.Sa == i.Sb
+        True
+        >>> i.Sa == 3
+        True
+        >>> 3 == i.Sb
+        True
+        >>> 4 == i.Sb
+        False
+        >>> i.Sa == 4
+        False
+        >>> i.Sa == 3.001
+        False
+        >>> i.Sa < 3.001
+        True
+        >>> i.Sa > 3.001
+        False
+        >>> 3 < i.Sa
+        False
+        >>> 3 <= i.Sa
+        True
+        """
+        import operator
+        op = { 0: operator.lt, 2: operator.eq, 4: operator.gt, 1: operator.le, 3: operator.ne, 5: operator.ge}[operation]
+        if isinstance(y, ScalarValue):
+            return op(x, str(y))
+        if isinstance(y, (int, float, str)):
+            return op(type(y)(x), y)
+        raise NotImplementedError()
+
+    def __hash__(self):
+        r"""
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i.Sa = 3
+        >>> d = {i.Sa: "test"}
+        >>> d[3]
+        'test'
+        >>> i.Sb = None
+        >>> d[i.Sb] = 19
+        >>> d[None]
+        19
+        """
+        if not perl.SvOK(self._sv):
+            return hash(None)
+        if perl.SvIOK(self._sv):
+            return hash(int(self))
+        if perl.SvNOK(self._sv):
+            return hash(float(self))
+        if perl.SvROK(self._sv):
+            raise NotImplementedError("Mutable types are not hashable")
+        raise NotImplementedError()
 
     def __iter__(self):
         cdef perl.SV** scalar_value
