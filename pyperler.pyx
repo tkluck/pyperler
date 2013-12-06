@@ -459,7 +459,7 @@ class Interpreter(object):
         elif initial in 'PH':
             hash_value = perl.get_hv(name, perl.GV_ADD)
             perl.hv_clear(hash_value)
-            for k, v in value.iteritems():
+            for k, v in value.items():
                 k = str(k)
                 perl.hv_store(hash_value, k, len(k), _new_sv_from_object(v), 0)
         else:
@@ -633,7 +633,7 @@ cdef perl.SV *_new_sv_from_object(object value):
                 return perl.newSVpvn_utf8('', 0, True)
         elif isinstance(value, dict):
             hash_value = perl.newHV()
-            for k, v in value.iteritems():
+            for k, v in value.items():
                 k = str(k)
                 perl.hv_store(hash_value, k, len(k), _new_sv_from_object(v), 0)
             return perl.newRV_noinc(<perl.SV*>hash_value)
@@ -703,7 +703,7 @@ cdef class ScalarValue:
                 return [x.to_python() if isinstance(x, ScalarValue) else x for x in self]
             if perl.SvTYPE(ref_value) == perl.SVt_PVHV:
                 return {(k.to_python() if isinstance(k, ScalarValue) else k):
-                        (v.to_python() if isinstance(v, ScalarValue) else v) for k,v in self}
+                        (v.to_python() if isinstance(v, ScalarValue) else v) for k,v in self.items()}
         if perl.SvIOK(self._sv):
             return int(self)
         if perl.SvNOK(self._sv):
@@ -1033,7 +1033,26 @@ cdef class ScalarValue:
             count = perl.hv_iterinit(hash_value)
             for i in range(count):
                 sv = perl.hv_iternextsv(hash_value, &key, &retlen)
+                yield key
+
+    def items(self):
+        cdef perl.SV* ref_value
+        cdef perl.HV* hash_value
+        cdef int count
+        cdef char* key
+        cdef int retlen
+        if not perl.SvROK(self._sv):
+            raise TypeError("not a hash")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) == perl.SVt_PVHV:
+            hash_value = <perl.HV*>ref_value
+            count = perl.hv_iterinit(hash_value)
+            for i in range(count):
+                sv = perl.hv_iternextsv(hash_value, &key, &retlen)
                 yield key, _sv_new(sv, self._interpreter)
+        else:
+            raise TypeError("not a hash")
+
 
     def __getitem__(self, key):
         cdef perl.SV** scalar_value
@@ -1097,7 +1116,7 @@ cdef class ScalarValue:
             >>> i['{a => 1, b => 2}'].result(False).dict()
             {'a': 1, 'b': 2}
         """
-        return {key: value for key, value in self}
+        return {key: value for key, value in self.items()}
 
     def keys(self):
         return self.dict().keys()
@@ -1215,7 +1234,7 @@ cdef class LazyCalledSub:
             perl.XPUSHs(self._self)
         for arg in self._args:
             perl.mXPUSHs(_new_sv_from_object(arg))
-        for k,v in self._kwds.iteritems():
+        for k,v in self._kwds.items():
             perl.mXPUSHs(_new_sv_from_object(k))
             perl.mXPUSHs(_new_sv_from_object(v))
         perl.PUTBACK
