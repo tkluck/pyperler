@@ -594,7 +594,7 @@ cdef _sv_new(perl.SV *sv, object interpreter):
         if(magic and magic[0].mg_virtual == &virtual_table):
             obj = <object><void*>perl.SvIVX(sv)
             return obj
-    if sv and perl.SvOK(sv):
+    if sv:
         ret = ScalarValue()
         ret._interpreter = interpreter
         ret._sv = perl.SvREFCNT_inc(sv)
@@ -677,6 +677,38 @@ cdef class ScalarValue:
 
     def __dealloc__(self):
         perl.SvREFCNT_dec(self._sv)
+
+    def to_python(self):
+        r"""
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i('$a = 3')
+        >>> type(i.Sa.to_python())
+        <type 'int'>
+        >>> i('@a = (1,2,3,4)')
+        >>> type(i.Aa.to_python())
+        <type 'list'>
+        >>> i('%a = (a => 3, b => 4)')
+        >>> type(i.Ha.to_python())
+        <type 'dict'>
+        >>> i('$b = undef')
+        >>> type(i.Sb.to_python())
+        <type 'NoneType'>
+        """
+        cdef perl.SV* ref_value
+        if not perl.SvOK(self._sv):
+            return None
+        if perl.SvROK(self._sv):
+            ref_value = perl.SvRV(self._sv)
+            if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
+                return [x.to_python() if isinstance(x, ScalarValue) else x for x in self]
+            if perl.SvTYPE(ref_value) == perl.SVt_PVHV:
+                return {(k.to_python() if isinstance(k, ScalarValue) else k):
+                        (v.to_python() if isinstance(v, ScalarValue) else v) for k,v in self}
+        if perl.SvIOK(self._sv):
+            return int(self)
+        if perl.SvNOK(self._sv):
+            return float(self)
+        return str(self)
 
     def __str__(self):
         u"""
