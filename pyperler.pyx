@@ -97,7 +97,7 @@ Assigning iterables to arrays:
 Accessing hash values:
 >>> i("%b = (greece => 'Aristotle', germany => 'Hegel');")
 >>> i.Pb.dict()
-{'germany': 'Hegel', 'greece': 'Aristotle'}
+{u'germany': 'Hegel', u'greece': 'Aristotle'}
 >>> i.Pb['greece']
 'Aristotle'
 >>> i.Pb['germany'] = 'Kant'
@@ -140,7 +140,7 @@ Nested structures:
 5
 
 Assigning non-string iterables to a nested element will create an arrayref:
->>> i.Sa['array'] = xrange(2,5)
+>>> i.Sa['array'] = range(2,5)
 >>> i["@{ $a->{array} }"].ints()
 (2, 3, 4)
 
@@ -171,7 +171,7 @@ Passing a Perl function as a callback to python. You'll need to
 specify whether you want it to evaluate in scalar context or
 list context:
 >>> def long_computation(on_ready):
-...     for i in xrange(10**5): 2 + 2
+...     for i in range(10**5): 2 + 2
 ...     return on_ready(5)
 ...
 >>> long_computation(i['sub { return 4; }'].scalar_context)
@@ -246,7 +246,7 @@ Test that we recover objects when we pass them through perl
 
 And that indexing and getting the length works:
 >>> i['sub { return $_[0]->{miss}; }'](foobar)
-'key: miss'
+u'key: miss'
 >>> i['sub { $_[0]->{funny_joke} = "dkfjasd"; return undef; }'](foobar)
 >>> i['sub { return $_[0] ? "YES" : "no"; }'](foobar)
 'YES'
@@ -261,7 +261,7 @@ And that indexing and getting the length works:
 ...    [ "Earth", 6378, 5.52 ],
 ...    [ "Jupiter", 71030, 1.3 ],
 ... )
->>> print t.table.scalar_context()
+>>> print( t.table.scalar_context() )
 Planet  Radius Density
         km     g/cm^3 
 Mercury  2360  3.7    
@@ -350,7 +350,7 @@ cdef class _PerlInterpreter:
     def parse(self, argv):
         cdef char **string_buf = <char**>malloc(len(argv) * sizeof(char*))
         for i in range(len(argv)):
-            string_buf[i] = PyString_AsString(argv[i])
+            string_buf[i] = <char*>(argv[i])
         perl.perl_parse(perl.my_perl, &xs_init, len(argv), string_buf, NULL)
         free(string_buf)
 
@@ -360,7 +360,7 @@ cdef class _PerlInterpreter:
 class Interpreter(object):
     def __init__(self):
         self._interpreter = _PerlInterpreter()
-        self._interpreter.parse(["","-e",PythonObjectPackage])
+        self._interpreter.parse([b"",b"-e",PythonObjectPackage])
         self._interpreter.run()
 
     def __call__(self, code):
@@ -373,7 +373,7 @@ class Interpreter(object):
         """
         >>> import pyperler; i = pyperler.Interpreter()
         >>> i('use Data::Dumper')
-        >>> print i.F['Dumper']({1: 2, 2: 3})
+        >>> print( i.F['Dumper']({1: 2, 2: 3}) )
         $VAR1 = {
                   '1' => 2,
                   '2' => 3
@@ -384,27 +384,25 @@ class Interpreter(object):
         cdef perl.SV *scalar_value
         cdef perl.AV *array_value
         cdef perl.HV *hash_value
+        short_name = str(name[1:]).encode()
         if initial in 'SD':
-            short_name = name[1:]
             scalar_value = perl.get_sv(short_name, 0)
             if scalar_value:
                 return _sv_new(scalar_value, self)
             else:
-                raise NameError("name '$%s' is not defined" % short_name)
+                raise NameError("name '$%s' is not defined" % name[1:])
         elif initial == 'A':
-            short_name = name[1:]
             array_value = perl.get_av(short_name, 0)
             if array_value:
                 return _sv_new(perl.newRV_inc(<perl.SV*>array_value), self)
             else:
-                raise NameError("name '@%s' is not defined" % short_name)
+                raise NameError("name '@%s' is not defined" % name[1:])
         elif initial in 'PH': 
-            short_name = name[1:]
             hash_value = perl.get_hv(short_name, 0)
             if hash_value:
                 return _sv_new(perl.newRV_inc(<perl.SV*>hash_value), self)
             else:
-                raise NameError("name '%%%s' is not defined" % short_name)
+                raise NameError("name '%%%s' is not defined" % name[1:])
         elif initial == 'F':
             if len(name) > 1:
                 return LazyFunctionVariable(self, name[1:])
@@ -439,31 +437,33 @@ class Interpreter(object):
         2
         >>> i.Ha = {1:2,2:3}
         >>> i.Ha.dict()
-        {'1': 2, '2': 3}
+        {u'1': 2, u'2': 3}
         >>> i.Ha[2]
         3
         """
         initial = name[0].upper()
-        name = name[1:]
+        short_name = str(name[1:]).encode()
         cdef perl.SV *sv
         cdef perl.AV *array_value
         cdef perl.HV *hash_value
         if initial in 'SD':
-            sv = perl.get_sv(name, perl.GV_ADD)
+            sv = perl.get_sv(short_name, perl.GV_ADD)
             _assign_sv(sv, value)
         elif initial == 'A':
-            array_value = perl.get_av(name, perl.GV_ADD)
+            array_value = perl.get_av(short_name, perl.GV_ADD)
             perl.av_clear(array_value)
             for element in value:
                 perl.av_push(array_value, _new_sv_from_object(element))
         elif initial in 'PH':
-            hash_value = perl.get_hv(name, perl.GV_ADD)
+            hash_value = perl.get_hv(short_name, perl.GV_ADD)
             perl.hv_clear(hash_value)
             for k, v in value.items():
-                k = str(k)
+                k = str(k).encode()
+            for k, v in value.iteritems():
+                k = str(k).encode()
                 perl.hv_store(hash_value, k, len(k), _new_sv_from_object(v), 0)
         else:
-            return object.__setattr__(self, initial + name, value)
+            return object.__setattr__(self, name, value)
 
 cdef class PerlPackage:
     cdef object _interpreter
@@ -516,7 +516,7 @@ cdef class LazyExpression:
         ret = [_sv_new(perl.POPs, self._interpreter) for _ in range(count)]
         perl.PUTBACK
         if perl.SvTRUE(perl.ERRSV):
-            raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
+            raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV).decode())
         ret = tuple(reversed(ret))
         if(list_context):
             return ret
@@ -527,7 +527,7 @@ cdef class LazyExpression:
         if isinstance(self._expression, ScalarValue):
             return perl.SvREFCNT_inc((<ScalarValue>self._expression)._sv)
         else:
-            expression = str(self._expression)
+            expression = str(self._expression).encode()
             return perl.newSVpvn_utf8(expression, len(expression), True)
         
     def __call__(self, *args, **kwds):
@@ -625,6 +625,7 @@ cdef perl.SV *_new_sv_from_object(object value):
         elif isinstance(value, float):
             return perl.newSVnv(value)
         elif isinstance(value, str):
+            value = value.encode()
             return perl.newSVpvn_utf8(value, len(value), True)
         elif isinstance(value, bool):
             if value:
@@ -634,7 +635,7 @@ cdef perl.SV *_new_sv_from_object(object value):
         elif isinstance(value, dict):
             hash_value = perl.newHV()
             for k, v in value.items():
-                k = str(k)
+                k = str(k).encode()
                 perl.hv_store(hash_value, k, len(k), _new_sv_from_object(v), 0)
             return perl.newRV_noinc(<perl.SV*>hash_value)
         elif isinstance(value, ScalarValue):
@@ -682,17 +683,17 @@ cdef class ScalarValue:
         r"""
         >>> import pyperler; i = pyperler.Interpreter()
         >>> i('$a = 3')
-        >>> type(i.Sa.to_python())
-        <type 'int'>
+        >>> type(i.Sa.to_python()) is int
+        True
         >>> i('@a = (1,2,3,4)')
-        >>> type(i.Aa.to_python())
-        <type 'list'>
+        >>> type(i.Aa.to_python()) is list
+        True
         >>> i('%a = (a => 3, b => 4)')
-        >>> type(i.Ha.to_python())
-        <type 'dict'>
+        >>> type(i.Ha.to_python()) is dict
+        True
         >>> i('$b = undef')
-        >>> type(i.Sb.to_python())
-        <type 'NoneType'>
+        >>> type(i.Sb.to_python()) is type(None)
+        True
         """
         cdef perl.SV* ref_value
         if not perl.SvOK(self._sv):
@@ -727,10 +728,13 @@ cdef class ScalarValue:
         """
         cdef int length = 0
         cdef char *perl_string = perl.SvPVutf8(self._sv, length)
-        return perl_string[:length]
+        return perl_string[:length].decode()
 
     def __int__(self):
         return <long>perl.SvIV(self._sv)
+
+    def __index__(self):
+        return int(self)
 
     def __float__(self):
         return <double>perl.SvNV(self._sv)
@@ -1035,7 +1039,7 @@ cdef class ScalarValue:
             count = perl.hv_iterinit(hash_value)
             for i in range(count):
                 sv = perl.hv_iternextsv(hash_value, &key, &retlen)
-                yield key
+                yield bytes(key).decode()
 
     def items(self):
         cdef perl.SV* ref_value
@@ -1051,10 +1055,9 @@ cdef class ScalarValue:
             count = perl.hv_iterinit(hash_value)
             for i in range(count):
                 sv = perl.hv_iternextsv(hash_value, &key, &retlen)
-                yield key, _sv_new(sv, self._interpreter)
+                yield bytes(key).decode(), _sv_new(sv, self._interpreter)
         else:
             raise TypeError("not a hash")
-
 
     def __getitem__(self, key):
         cdef perl.SV** scalar_value
@@ -1073,7 +1076,7 @@ cdef class ScalarValue:
                 raise IndexError(key)
         elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
             hash_value = <perl.HV*>ref_value
-            key = str(key)
+            key = str(key).encode()
             scalar_value = perl.hv_fetch(hash_value, key, len(key), False)
             if scalar_value:
                 return _sv_new(scalar_value[0], self._interpreter)
@@ -1093,7 +1096,7 @@ cdef class ScalarValue:
             perl.av_store(array_value, key, _new_sv_from_object(value))
         elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
             hash_value = <perl.HV*>ref_value
-            key = str(key)
+            key = str(key).encode()
             perl.hv_store(hash_value, key, len(key), _new_sv_from_object(value), 0)
 
     def __call__(self, *args, **kwds):
@@ -1116,7 +1119,7 @@ cdef class ScalarValue:
         """
             >>> import pyperler; i = pyperler.Interpreter()
             >>> i['{a => 1, b => 2}'].result(False).dict()
-            {'a': 1, 'b': 2}
+            {u'a': 1, u'b': 2}
         """
         return {key: value for key, value in self.items()}
 
@@ -1242,9 +1245,11 @@ cdef class LazyCalledSub:
         perl.PUTBACK
         try:
             if self._self:
-                count = perl.call_method(self._method, perl.G_EVAL|flag)
+                method = str(self._method).encode()
+                count = perl.call_method(method, perl.G_EVAL|flag)
             elif self._name:
-                count = perl.call_pv(self._name, perl.G_EVAL|flag)
+                name = str(self._name).encode()
+                count = perl.call_pv(name, perl.G_EVAL|flag)
             elif self._sv:
                 count = perl.call_sv(self._sv, perl.G_EVAL|flag)
             else:
@@ -1253,7 +1258,7 @@ cdef class LazyCalledSub:
             ret = [_sv_new(perl.POPs, self._interpreter) for i in range(count)]
             ret.reverse()
             if perl.SvTRUE(perl.ERRSV):
-                raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV))
+                raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV).decode())
             if list_context:
                 return tuple(ret)
             else:
