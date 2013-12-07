@@ -1,3 +1,8 @@
 import pyperler
 import doctest
-doctest.testmod(pyperler)
+import sys
+
+failure_count, test_count = doctest.testmod(pyperler)
+sys.exit(
+    1 if failure_count else 0
+)
