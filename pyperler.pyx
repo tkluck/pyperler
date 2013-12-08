@@ -988,6 +988,8 @@ cdef class ScalarValue:
         op = { 0: operator.lt, 2: operator.eq, 4: operator.gt, 1: operator.le, 3: operator.ne, 5: operator.ge}[operation]
         if isinstance(y, ScalarValue):
             return op(x, str(y))
+        if y is None:
+            return op(x.to_python(), y)
         if isinstance(y, (int, float, str)):
             return op(type(y)(x), y)
         raise NotImplementedError()
