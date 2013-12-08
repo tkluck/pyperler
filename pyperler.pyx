@@ -673,6 +673,33 @@ cdef _assign_sv(perl.SV *sv, object value):
         perl.SvSetSV(sv, _new_sv_from_object(value))
 
 cdef class ScalarValue:
+    """
+    >>> import pyperler; i = pyperler.Interpreter()
+    >>> i.Sa = 3
+    >>> i.Sb = 3
+    >>> i.Sa == i.Sb
+    Traceback (most recent call last):
+    ...
+    RuntimeError: Cannot use comparison operator on two perl scalar values '3' and '3'. Convert either one to string or to integer
+    >>> i.Sa == 3
+    True
+    >>> 3 == i.Sb
+    True
+    >>> 4 == i.Sb
+    False
+    >>> i.Sa == 4
+    False
+    >>> i.Sa == 3.001
+    False
+    >>> i.Sa < 3.001
+    True
+    >>> i.Sa > 3.001
+    False
+    >>> 3 < i.Sa
+    False
+    >>> 3 <= i.Sa
+    True
+    """
     cdef perl.SV *_sv
     cdef object _interpreter
 
@@ -963,35 +990,10 @@ cdef class ScalarValue:
     #def __or__(x, y):
     #def __xor__(x, y):
     def __richcmp__(x, y, operation):
-        r"""
-        >>> import pyperler; i = pyperler.Interpreter()
-        >>> i.Sa = 3
-        >>> i.Sb = 3
-        >>> i.Sa == i.Sb
-        True
-        >>> i.Sa == 3
-        True
-        >>> 3 == i.Sb
-        True
-        >>> 4 == i.Sb
-        False
-        >>> i.Sa == 4
-        False
-        >>> i.Sa == 3.001
-        False
-        >>> i.Sa < 3.001
-        True
-        >>> i.Sa > 3.001
-        False
-        >>> 3 < i.Sa
-        False
-        >>> 3 <= i.Sa
-        True
-        """
         import operator
         op = { 0: operator.lt, 2: operator.eq, 4: operator.gt, 1: operator.le, 3: operator.ne, 5: operator.ge}[operation]
         if isinstance(y, ScalarValue):
-            return op(x, str(y))
+            raise RuntimeError("Cannot use comparison operator on two perl scalar values '%s' and '%s'. Convert either one to string or to integer" % (x, y))
         if y is None:
             return op(x.to_python(), y)
         if isinstance(y, (int, float, str)):
