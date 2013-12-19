@@ -306,12 +306,29 @@ Use Perl's awesome interface to regular expressions for shorter code:
 >>> a,b,c = i['/(.)(.)(.)/']
 >>> a,b,c
 ('a', 'b', 'c')
+
+We support the common perl idiom
+while(my $row = $object->next) {
+    ...
+}
+for iteration:
+
+>>> i('use DummyIterable')
+>>> i('$numbers = bless [1,2,3], "DummyIterable"')
+>>> for a in i.Snumbers:
+...     print(a)
+...
+1
+2
+3
 """
 from libc.stdlib cimport malloc, free
 cimport dlfcn
 from cpython.string cimport PyString_AsString
 from cpython cimport PyObject, Py_XINCREF
 cimport perl
+
+from collections import defaultdict
 
 include "PythonObjectPm.pyx"
 
@@ -362,6 +379,7 @@ class Interpreter(object):
         self._interpreter = _PerlInterpreter()
         self._interpreter.parse([b"",b"-e",PythonObjectPackage])
         self._interpreter.run()
+        self._iterable_methods = defaultdict(lambda: 'next')
 
     def __call__(self, code):
         self[str(code)].result(False)
@@ -412,8 +430,8 @@ class Interpreter(object):
                         return LazyFunctionVariable(self, key)
                 return FunctionLookup()
         elif name == 'use':
-            def perl_package_constructor(package_name):
-                return PerlPackage(self, package_name)
+            def perl_package_constructor(*args, **kwds):
+                return PerlPackage(self, *args, **kwds)
             return perl_package_constructor
         else:
             return object.__getattribute__(self, name)
@@ -468,8 +486,9 @@ class Interpreter(object):
 cdef class PerlPackage:
     cdef object _interpreter
     cdef object _name
-    def __init__(self, interpreter, name):
+    def __init__(self, interpreter, name, iterable_method='next'):
         self._interpreter = interpreter
+        self._interpreter._iterable_methods[name] = iterable_method
         self._name = name
         try:
             interpreter('use ' + name)
@@ -1032,6 +1051,15 @@ cdef class ScalarValue:
         cdef int retlen
         if not perl.SvROK(self._sv):
             raise TypeError("not an array or hash")
+        package = self.blessed_package()
+        if package:
+            method = self._interpreter._iterable_methods[package]
+            next_ = getattr(self, method)
+            item = next_()
+            while item:
+                yield item
+                item = next_()
+            return
         ref_value = perl.SvRV(self._sv)
         if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
             for ix in xrange(len(self)):
@@ -1137,10 +1165,16 @@ cdef class ScalarValue:
     def ints(self):
         return tuple(int(_) for _ in self)
 
+    def blessed_package(self):
+        ref = str(self._interpreter['sub { ref $_[0]; }'](self))
+        if ref != 'HASH' and ref != 'ARRAY':
+            return ref
+        return None
+
     def __dir__(self):
         try:
             Inspector = self._interpreter.use('Class::Inspector')
-            classname = str(self._interpreter['sub { ref $_[0]; }'](self))
+            classname = self.blessed_package()
             return [str(method) for method in Inspector.methods(classname)]
         except (ImportError, TypeError):
             return []
