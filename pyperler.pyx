@@ -534,6 +534,7 @@ cdef class LazyExpression:
         cdef int count
         with nogil:
             count = perl.eval_sv(expression_sv, perl.G_EVAL|flag)
+        perl.SvREFCNT_dec(expression_sv)
         perl.SPAGAIN
         ret = [_sv_new(perl.POPs, self._interpreter) for _ in range(count)]
         perl.PUTBACK
