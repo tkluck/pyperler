@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-cdef void call_object(perl.CV* p1, perl.CV* p2):
+cdef void call_object(perl.CV* p1, perl.CV* p2) with gil:
     perl.dSP
     perl.dMARK
     perl.dAX
@@ -42,7 +42,7 @@ cdef void call_object(perl.CV* p1, perl.CV* p2):
         perl.croak(value.message)
 
 
-cdef void object_to_str(perl.CV* p1, perl.CV* p2):
+cdef void object_to_str(perl.CV* p1, perl.CV* p2) with gil:
     perl.dSP
     perl.dMARK
     perl.dAX
@@ -67,7 +67,7 @@ cdef void object_to_str(perl.CV* p1, perl.CV* p2):
         exctype, value = sys.exc_info()[:2]
         perl.croak(value.message)
 
-cdef void object_to_bool(perl.CV* p1, perl.CV* p2):
+cdef void object_to_bool(perl.CV* p1, perl.CV* p2) with gil:
     perl.dSP
     perl.dMARK
     perl.dAX
@@ -92,7 +92,7 @@ cdef void object_to_bool(perl.CV* p1, perl.CV* p2):
         exctype, value = sys.exc_info()[:2]
         perl.croak(value.message)
 
-cdef void object_get_item(perl.CV* p1, perl.CV* p2):
+cdef void object_get_item(perl.CV* p1, perl.CV* p2) with gil:
     perl.dSP
     perl.dMARK
     perl.dAX
@@ -119,7 +119,7 @@ cdef void object_get_item(perl.CV* p1, perl.CV* p2):
         perl.croak(value.message)
 
 
-cdef void object_set_item(perl.CV* p1, perl.CV* p2):
+cdef void object_set_item(perl.CV* p1, perl.CV* p2) with gil:
     perl.dSP
     perl.dMARK
     perl.dAX
@@ -146,7 +146,7 @@ cdef void object_set_item(perl.CV* p1, perl.CV* p2):
         exctype, value = sys.exc_info()[:2]
         perl.croak(value.message)
 
-cdef void object_del_item(perl.CV* p1, perl.CV* p2):
+cdef void object_del_item(perl.CV* p1, perl.CV* p2) with gil:
     perl.dSP
     perl.dMARK
     perl.dAX
@@ -174,7 +174,7 @@ cdef void object_del_item(perl.CV* p1, perl.CV* p2):
         perl.croak(value.message)
 
 
-cdef void object_length(perl.CV* p1, perl.CV* p2):
+cdef void object_length(perl.CV* p1, perl.CV* p2) with gil:
     perl.dSP
     perl.dMARK
     perl.dAX
@@ -199,7 +199,7 @@ cdef void object_length(perl.CV* p1, perl.CV* p2):
         exctype, value = sys.exc_info()[:2]
         perl.croak(value.message)
 
-cdef void object_is_mapping(perl.CV* p1, perl.CV* p2):
+cdef void object_is_mapping(perl.CV* p1, perl.CV* p2) with gil:
     perl.dSP
     perl.dMARK
     perl.dAX

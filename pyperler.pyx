@@ -528,9 +528,12 @@ cdef class LazyExpression:
         if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
         self._evaluated = True
 
-        cdef flag = perl.G_ARRAY if list_context else perl.G_SCALAR
+        cdef int flag = perl.G_ARRAY if list_context else perl.G_SCALAR
         perl.dSP
-        cdef int count = perl.eval_sv(self._expression_sv(), perl.G_EVAL|flag)
+        cdef perl.SV* expression_sv = self._expression_sv()
+        cdef int count
+        with nogil:
+            count = perl.eval_sv(expression_sv, perl.G_EVAL|flag)
         perl.SPAGAIN
         ret = [_sv_new(perl.POPs, self._interpreter) for _ in range(count)]
         perl.PUTBACK
@@ -1262,10 +1265,11 @@ cdef class LazyCalledSub:
         if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
         self._evaluated = True
 
-        cdef flag = perl.G_ARRAY if list_context else perl.G_SCALAR
+        cdef int flag = perl.G_ARRAY if list_context else perl.G_SCALAR
 
         cdef int count
         cdef int i
+        cdef char* name
         perl.dSP
         perl.ENTER
         perl.SAVETMPS 
@@ -1281,13 +1285,18 @@ cdef class LazyCalledSub:
         perl.PUTBACK
         try:
             if self._self:
-                method = str(self._method).encode()
-                count = perl.call_method(method, perl.G_EVAL|flag)
+                method_str = str(self._method).encode()
+                name = method_str
+                with nogil:
+                    count = perl.call_method(name, perl.G_EVAL|flag)
             elif self._name:
-                name = str(self._name).encode()
-                count = perl.call_pv(name, perl.G_EVAL|flag)
+                name_str = str(self._name).encode()
+                name = name_str
+                with nogil:
+                    count = perl.call_pv(name, perl.G_EVAL|flag)
             elif self._sv:
-                count = perl.call_sv(self._sv, perl.G_EVAL|flag)
+                with nogil:
+                    count = perl.call_sv(self._sv, perl.G_EVAL|flag)
             else:
                 raise AssertionError()
             perl.SPAGAIN

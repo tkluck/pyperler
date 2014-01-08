@@ -65,11 +65,11 @@ cdef extern from "perl.h":
 
     void croak(char* message)
 
-    SV *eval_pv(char *code, bint croak_on_error)
-    int eval_sv(SV *scalar_value, int flags)
-    int call_method(char *method_name, int flags)
-    int call_pv(char *name, int flags)
-    int call_sv(SV* scalar_value, int flags)
+    SV *eval_pv(char *code, bint croak_on_error) nogil
+    int eval_sv(SV *scalar_value, int flags) nogil
+    int call_method(char *method_name, int flags) nogil
+    int call_pv(char *name, int flags) nogil
+    int call_sv(SV* scalar_value, int flags) nogil
 
     SV *newSV(int len)
     SV *newSVpvn_utf8(char *value, int length, bint utf8)
