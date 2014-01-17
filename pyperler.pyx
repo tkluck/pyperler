@@ -744,6 +744,12 @@ cdef class ScalarValue:
         >>> i('$b = undef')
         >>> type(i.Sb.to_python()) is type(None)
         True
+        >>> i('$c = "4.5"')
+        >>> type(i.Sc.to_python()) is float
+        True
+        >>> i('$d = "-4"')
+        >>> type(i.Sd.to_python()) is int
+        True
         """
         cdef perl.SV* ref_value
         if not perl.SvOK(self._sv):
@@ -755,11 +761,13 @@ cdef class ScalarValue:
             if perl.SvTYPE(ref_value) == perl.SVt_PVHV:
                 return {(k.to_python() if isinstance(k, ScalarValue) else k):
                         (v.to_python() if isinstance(v, ScalarValue) else v) for k,v in self.items()}
-        if perl.SvIOK(self._sv):
-            return int(self)
-        if perl.SvNOK(self._sv):
-            return float(self)
-        return str(self)
+        if self._interpreter['sub { my $i = shift; (0+$i) eq $i; }'](self):
+            if self._interpreter['sub { my $i = shift; int $i eq $i; }'](self):
+                return int(self)
+            else:
+                return float(self)
+        else:
+            return str(self)
 
     def __str__(self):
         u"""
