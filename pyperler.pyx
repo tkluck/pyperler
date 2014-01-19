@@ -386,8 +386,8 @@ cdef class Interpreter(object):
         self._interpreter.run()
         self._iterable_methods = defaultdict(lambda: 'next')
 
-        self._is_numeric = self['sub { my $i = shift; (0+$i) eq $i; }'].result(False)
-        self._is_integer = self['sub { my $i = shift; int $i eq $i; }'].result(False)
+        self._is_numeric = self['sub { my $i = shift; (0+$i) == $i; }'].result(False)
+        self._is_integer = self['sub { my $i = shift; int $i == $i; }'].result(False)
         self._ref = self['sub { ref $_[0]; }'].result(False)
 
     def __call__(self, code):
