@@ -377,11 +377,18 @@ cdef class _PerlInterpreter:
 cdef class Interpreter(object):
     cdef _PerlInterpreter _interpreter
     cdef object _iterable_methods
+    cdef readonly ScalarValue _ref
+    cdef readonly ScalarValue _is_numeric
+    cdef readonly ScalarValue _is_integer
     def __init__(self):
         self._interpreter = _PerlInterpreter()
         self._interpreter.parse([b"",b"-e",PythonObjectPackage])
         self._interpreter.run()
         self._iterable_methods = defaultdict(lambda: 'next')
+
+        self._is_numeric = self['sub { my $i = shift; (0+$i) eq $i; }'].result(False)
+        self._is_integer = self['sub { my $i = shift; int $i eq $i; }'].result(False)
+        self._ref = self['sub { ref $_[0]; }'].result(False)
 
     def __call__(self, code):
         self[str(code)].result(False)
@@ -763,8 +770,8 @@ cdef class ScalarValue:
             if perl.SvTYPE(ref_value) == perl.SVt_PVHV:
                 return {(k.to_python() if isinstance(k, ScalarValue) else k):
                         (v.to_python() if isinstance(v, ScalarValue) else v) for k,v in self.items()}
-        if self._interpreter['sub { my $i = shift; (0+$i) eq $i; }'](self):
-            if self._interpreter['sub { my $i = shift; int $i eq $i; }'](self):
+        if self._interpreter._is_numeric(self):
+            if self._interpreter._is_integer(self):
                 return int(self)
             else:
                 return float(self)
@@ -1180,7 +1187,7 @@ cdef class ScalarValue:
         return tuple(int(_) for _ in self)
 
     def blessed_package(self):
-        ref = str(self._interpreter['sub { ref $_[0]; }'](self))
+        ref = str(self._interpreter._ref(self))
         if ref != 'HASH' and ref != 'ARRAY':
             return ref
         return None
