@@ -39,7 +39,10 @@ cdef void call_object(perl.CV* p1, perl.CV* p2) with gil:
             raise RuntimeError("Not a python object")
     except:
         exctype, value = sys.exc_info()[:2]
-        perl.croak(value.message)
+        if hasattr(value, 'message'):
+            perl.croak(value.message)
+        else:
+            perl.croak("Unhandled exception in call_object")
 
 
 cdef void object_to_str(perl.CV* p1, perl.CV* p2) with gil:
@@ -65,7 +68,10 @@ cdef void object_to_str(perl.CV* p1, perl.CV* p2) with gil:
             raise RuntimeError("Not a python object")
     except:
         exctype, value = sys.exc_info()[:2]
-        perl.croak(value.message)
+        if hasattr(value, 'message'):
+            perl.croak(value.message)
+        else:
+            perl.croak("Unhandled exception in object_to_str")
 
 cdef void object_to_bool(perl.CV* p1, perl.CV* p2) with gil:
     perl.dSP
@@ -90,7 +96,10 @@ cdef void object_to_bool(perl.CV* p1, perl.CV* p2) with gil:
             raise RuntimeError("Not a python object")
     except:
         exctype, value = sys.exc_info()[:2]
-        perl.croak(value.message)
+        if hasattr(value, 'message'):
+            perl.croak(value.message)
+        else:
+            perl.croak("Unhandled exception in object_to_bool")
 
 cdef void object_get_item(perl.CV* p1, perl.CV* p2) with gil:
     perl.dSP
@@ -116,7 +125,10 @@ cdef void object_get_item(perl.CV* p1, perl.CV* p2) with gil:
             raise RuntimeError("Not a python object")
     except:
         exctype, value = sys.exc_info()[:2]
-        perl.croak(value.message)
+        if hasattr(value, 'message'):
+            perl.croak(value.message)
+        else:
+            perl.croak("Unhandled exception in object_get_item")
 
 
 cdef void object_set_item(perl.CV* p1, perl.CV* p2) with gil:
@@ -171,7 +183,10 @@ cdef void object_del_item(perl.CV* p1, perl.CV* p2) with gil:
             raise RuntimeError("Not a python object")
     except:
         exctype, value = sys.exc_info()[:2]
-        perl.croak(value.message)
+        if hasattr(value, 'message'):
+            perl.croak(value.message)
+        else:
+            perl.croak("Unhandled exception in object_del_item")
 
 
 cdef void object_length(perl.CV* p1, perl.CV* p2) with gil:
@@ -197,7 +212,10 @@ cdef void object_length(perl.CV* p1, perl.CV* p2) with gil:
             raise RuntimeError("Not a python object")
     except:
         exctype, value = sys.exc_info()[:2]
-        perl.croak(value.message)
+        if hasattr(value, 'message'):
+            perl.croak(value.message)
+        else:
+            perl.croak("Unhandled exception in object_length")
 
 cdef void object_is_mapping(perl.CV* p1, perl.CV* p2) with gil:
     perl.dSP
@@ -222,7 +240,10 @@ cdef void object_is_mapping(perl.CV* p1, perl.CV* p2) with gil:
             raise RuntimeError("Not a python object")
     except:
         exctype, value = sys.exc_info()[:2]
-        perl.croak(value.message)
+        if hasattr(value, 'message'):
+            perl.croak(value.message)
+        else:
+            perl.croak("Unhandled exception in object_is_mapping")
 
 cdef void dummy(perl.CV* p1, perl.CV* p2):
     return
