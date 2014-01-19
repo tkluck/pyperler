@@ -738,7 +738,7 @@ cdef class ScalarValue:
     def __dealloc__(self):
         perl.SvREFCNT_dec(self._sv)
 
-    def to_python(self):
+    def to_python(self, numeric_if_possible=True, force_scalar_to=None):
         r"""
         >>> import pyperler; i = pyperler.Interpreter()
         >>> i('$a = 3')
@@ -759,6 +759,11 @@ cdef class ScalarValue:
         >>> i('$d = "-4"')
         >>> type(i.Sd.to_python()) is int
         True
+        >>> i('$e = "-4"')
+        >>> type(i.Se.to_python(numeric_if_possible=False)) is str
+        True
+        >>> i.Se.to_python(force_scalar_to=float)
+        -4.0
         """
         cdef perl.SV* ref_value
         if not perl.SvOK(self._sv):
@@ -770,11 +775,15 @@ cdef class ScalarValue:
             if perl.SvTYPE(ref_value) == perl.SVt_PVHV:
                 return {(k.to_python() if isinstance(k, ScalarValue) else k):
                         (v.to_python() if isinstance(v, ScalarValue) else v) for k,v in self.items()}
-        if self._interpreter._is_numeric(self):
-            if self._interpreter._is_integer(self):
-                return int(self)
-            else:
-                return float(self)
+        if force_scalar_to is not None:
+            return force_scalar_to(self)
+
+        if numeric_if_possible:
+            if self._interpreter._is_numeric(self):
+                if self._interpreter._is_integer(self):
+                    return int(self)
+                else:
+                    return float(self)
         else:
             return str(self)
 
