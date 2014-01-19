@@ -898,6 +898,9 @@ cdef class ScalarValue:
         [1, 2, 3, 4, 5]
         >>> [0] + i.Sb
         [0, 1, 2, 3]
+        >>> i.Sb = "Three"
+        >>> i.Sb + " beers please"
+        'Three beers please'
         """
 
         if isinstance(y, str):
