@@ -792,9 +792,9 @@ cdef class ScalarValue:
         Do some checks about copying the string, and accurate refcounting:
 
         >>> import pyperler; i = pyperler.Interpreter()
-        >>> i.Sa = "abc" + str(type(i))   # i.Sa is assigned a temporary string object
+        >>> i.Sa = "abc" + str(type(i)).replace('type ','').replace('class ','')  # i.Sa is assigned a temporary string object
         >>> i.Sa
-        "abc<type 'pyperler.Interpreter'>"
+        "abc<'pyperler.Interpreter'>"
         >>> text = str(i.Sa)
         >>> i.Sa = "def"
         >>> text[:3]
@@ -983,25 +983,27 @@ cdef class ScalarValue:
     def __floordiv__(x, y):
         """
         >>> import pyperler; i = pyperler.Interpreter()
+        >>> from operator import floordiv
         >>> i.Sa = 3
-        >>> i.Sa / 3
+        >>> floordiv(i.Sa, 3)
         1
         >>> #8 / i.Sa
         2
         >>> i.Sb = 10
-        >>> i.Sb / i.Sa
+        >>> floordiv(i.Sb, i.Sa)
         3
         """
+        from operator import floordiv
         if isinstance(y, ScalarValue):
             if perl.SvIOK((<ScalarValue>y)._sv):
-                return x / int(y)
+                return floordiv(x, int(y))
             if perl.SvNOK((<ScalarValue>y)._sv):
-                return x / float(y)
+                return floordiv(x, float(y))
         if isinstance(y, (int, float)):
             if perl.SvIOK((<ScalarValue>x)._sv):
-                return int(x) / y
+                return floordiv(int(x), y)
             if perl.SvNOK((<ScalarValue>x)._sv):
-                return float(x) / y
+                return floordiv(float(x), y)
         raise NotImplementedError()
 
     def __truediv__(x, y):
