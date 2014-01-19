@@ -96,8 +96,6 @@ Assigning iterables to arrays:
 
 Accessing hash values:
 >>> i("%b = (greece => 'Aristotle', germany => 'Hegel');")
->>> i.Pb.dict()
-{u'germany': 'Hegel', u'greece': 'Aristotle'}
 >>> i.Pb['greece']
 'Aristotle'
 >>> i.Pb['germany'] = 'Kant'
@@ -229,7 +227,7 @@ Test that we recover objects when we pass them through perl
 ...    def foo(self):
 ...       return "bar"
 ...    def __getitem__(self, key):
-...         return 'key: %s' % key
+...         return 'key length: %d' % len(key)
 ...    def __setitem__(self, key, value):
 ...         self._last_set_item = value
 ...    def __len__(self):
@@ -246,7 +244,7 @@ Test that we recover objects when we pass them through perl
 
 And that indexing and getting the length works:
 >>> i['sub { return $_[0]->{miss}; }'](foobar)
-u'key: miss'
+'key length: 4'
 >>> i['sub { $_[0]->{funny_joke} = "dkfjasd"; return undef; }'](foobar)
 >>> i['sub { return $_[0] ? "YES" : "no"; }'](foobar)
 'YES'
@@ -462,9 +460,9 @@ cdef class Interpreter(object):
         3
         >>> i.Aa[1]
         2
-        >>> i.Ha = {1:2,2:3}
-        >>> i.Ha.dict()
-        {u'1': 2, u'2': 3}
+        >>> i.Ha = {1:'2',2:'3'}
+        >>> sorted(i.Ha.to_python().values())
+        [2, 3]
         >>> i.Ha[2]
         3
         """
@@ -1180,19 +1178,11 @@ cdef class ScalarValue:
         ret._interpreter = self._interpreter
         return ret
 
-    def dict(self):
-        """
-            >>> import pyperler; i = pyperler.Interpreter()
-            >>> i['{a => 1, b => 2}'].result(False).dict()
-            {u'a': 1, u'b': 2}
-        """
-        return {key: value for key, value in self.items()}
-
     def keys(self):
-        return self.dict().keys()
+        return [k for k,v in self.items()]
 
     def values(self):
-        return self.dict().values()
+        return [v for k,v in self.items()]
 
     def strings(self):
         return tuple(str(_) for _ in self)
