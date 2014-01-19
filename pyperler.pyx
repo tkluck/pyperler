@@ -771,10 +771,10 @@ cdef class ScalarValue:
         if perl.SvROK(self._sv):
             ref_value = perl.SvRV(self._sv)
             if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
-                return [x.to_python() if isinstance(x, ScalarValue) else x for x in self]
+                return [x.to_python(numeric_if_possible, force_scalar_to) if isinstance(x, ScalarValue) else x for x in self]
             if perl.SvTYPE(ref_value) == perl.SVt_PVHV:
-                return {(k.to_python() if isinstance(k, ScalarValue) else k):
-                        (v.to_python() if isinstance(v, ScalarValue) else v) for k,v in self.items()}
+                return {(k.to_python(numeric_if_possible, force_scalar_to) if isinstance(k, ScalarValue) else k):
+                        (v.to_python(numeric_if_possible, force_scalar_to) if isinstance(v, ScalarValue) else v) for k,v in self.items()}
         if force_scalar_to is not None:
             return force_scalar_to(self)
 
