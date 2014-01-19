@@ -374,7 +374,9 @@ cdef class _PerlInterpreter:
     def run(self):
         perl.perl_run(perl.my_perl)
 
-class Interpreter(object):
+cdef class Interpreter(object):
+    cdef _PerlInterpreter _interpreter
+    cdef object _iterable_methods
     def __init__(self):
         self._interpreter = _PerlInterpreter()
         self._interpreter.parse([b"",b"-e",PythonObjectPackage])
@@ -481,10 +483,10 @@ class Interpreter(object):
                 k = str(k).encode()
                 perl.hv_store(hash_value, k, len(k), _new_sv_from_object(v), 0)
         else:
-            return object.__setattr__(self, name, value)
+            object.__setattr__(self, name, value)
 
 cdef class PerlPackage:
-    cdef object _interpreter
+    cdef Interpreter _interpreter
     cdef object _name
     def __init__(self, interpreter, name, iterable_method='next'):
         self._interpreter = interpreter
@@ -517,7 +519,7 @@ cdef class PerlPackage:
             return []
 
 cdef class LazyExpression:
-    cdef object _interpreter
+    cdef Interpreter _interpreter
     cdef object _expression
     cdef bint _evaluated
     def __init__(self, interpreter, expression):
@@ -595,7 +597,7 @@ cdef class LazyExpression:
 
 cdef class LazyFunctionVariable(object):
     cdef object _name
-    cdef object _interpreter
+    cdef Interpreter _interpreter
     def __init__(self, interpreter, name):
         self._name = name
         self._interpreter = interpreter
@@ -724,7 +726,7 @@ cdef class ScalarValue:
     True
     """
     cdef perl.SV *_sv
-    cdef object _interpreter
+    cdef Interpreter _interpreter
 
     def __dealloc__(self):
         perl.SvREFCNT_dec(self._sv)
@@ -776,7 +778,7 @@ cdef class ScalarValue:
         >>> import pyperler; i = pyperler.Interpreter()
         >>> i.Sa = "abc" + str(type(i))   # i.Sa is assigned a temporary string object
         >>> i.Sa
-        "abc<class 'pyperler.Interpreter'>"
+        "abc<type 'pyperler.Interpreter'>"
         >>> text = str(i.Sa)
         >>> i.Sa = "def"
         >>> text[:3]
@@ -1195,7 +1197,7 @@ cdef class ScalarValue:
 cdef class BoundMethod(object):
     cdef perl.SV *_sv
     cdef object _method
-    cdef object _interpreter
+    cdef Interpreter _interpreter
 
     def __call__(self, *args, **kwds):
         return CalledSub_new(None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds)
@@ -1262,7 +1264,7 @@ cdef object LazyCalledSub_new(object name, object method, object interpreter, pe
 cdef class LazyCalledSub:
     cdef object _name
     cdef object _method
-    cdef object _interpreter
+    cdef Interpreter _interpreter
     cdef perl.SV* _sv
 
     cdef perl.SV *_self
