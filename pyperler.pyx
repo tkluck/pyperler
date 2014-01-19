@@ -426,7 +426,7 @@ class Interpreter(object):
                 return LazyFunctionVariable(self, name[1:])
             else:
                 class FunctionLookup(object):
-                    def __getitem__(self, key):
+                    def __getitem__(this, key):
                         return LazyFunctionVariable(self, key)
                 return FunctionLookup()
         elif name == 'use':
