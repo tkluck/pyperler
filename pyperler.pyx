@@ -843,7 +843,7 @@ cdef class ScalarValue:
         cdef perl.AV* array_value
         cdef perl.SV* ref_value
         if not perl.SvROK(self._sv):
-            raise TypeError("not an array ref")
+            return len(str(self))
         ref_value = perl.SvRV(self._sv)
         if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
             array_value = <perl.AV*>ref_value
