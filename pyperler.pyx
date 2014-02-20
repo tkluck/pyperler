@@ -146,8 +146,8 @@ Similarly, assiging a dict to a nested element will create a hashref:
 >>> i.Sa['dictionary'] = {'c': 67, 'd': 68}
 >>> int(i['$a->{dictionary}->{c}'])
 67
->>> i['keys %{ $a->{dictionary} } '].strings()
-('c', 'd')
+>>> sorted(i['keys %{ $a->{dictionary} } '].strings())
+['c', 'd']
 
 Calling subs:
 >>> i("sub do_something { for (1..10) { 2 + 2 }; return 3; }")
@@ -198,6 +198,10 @@ But the canonical way is this:
 >>> _ = car.set_brand('Honda')
 >>> car.brand()
 'Honda'
+
+You can access class methods by calling them on the class:
+>>> Car.all_brands()
+('Toyota', 'Nissan')
 
 You can also pass Python functions as Perl callbacks:
 >>> def f(): return 3 
@@ -287,6 +291,7 @@ Test passing blessed scalar values through Python:
 'Car'
 
 We even support introspection if your local CPAN installation sports Class::Inspector:
+>>> Inspector = i.use('Class::Inspector') # this line is not needed, but if it fails you know you need to install Class::Inspector
 >>> Car.__dir__()
 ['all_brands', 'brand', 'distance', 'drive', 'new', 'out_of_gas', 'set_brand']
 >>> nissan_sunny = Car()
@@ -398,11 +403,13 @@ cdef class Interpreter(object):
         """
         >>> import pyperler; i = pyperler.Interpreter()
         >>> i('use Data::Dumper')
-        >>> print( i.F['Dumper']({1: 2, 2: 3}) )
-        $VAR1 = {
-                  '1' => 2,
-                  '2' => 3
-                };
+        >>> print( i.F['Dumper']([1, 2, 2, 3]) )
+        $VAR1 = [
+                  1,
+                  2,
+                  2,
+                  3
+                ];
         <BLANKLINE>
         """
         initial = name[0].upper()
