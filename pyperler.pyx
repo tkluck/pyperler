@@ -921,9 +921,11 @@ cdef class ScalarValue:
                 return int(x) + y
             if perl.SvNOK((<ScalarValue>x)._sv):
                 return float(x) + y
+            # huh?
+            return int(x) + y
         if isinstance(y, ScalarValue):
             raise RuntimeError("Cannot use + operator on two perl scalar values '%s' and '%s'. Convert either one to string or to integer" % (x, y))
-        raise NotImplementedError()
+        raise NotImplementedError("Cannot use + operator on two items of types '%s' and '%s'" %(type(x), type(y)))
 
     def __sub__(x, y):
         """
