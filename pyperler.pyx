@@ -1374,9 +1374,11 @@ cdef class LazyCalledSub:
 import sys,os
 PERL_SYS_INIT3(sys.argv, os.environ)
 
-# we need to reload the perl libary with RTLD_GLOBAL, because many compiled CPAN
-# modules assume that those symbols are available. Python does not import the
-# library's symbols into a global namespace
-cdef void* handle=dlfcn.dlopen("libperl.so",dlfcn.RTLD_LAZY|dlfcn.RTLD_GLOBAL)
-if(not handle):
-    raise RuntimeError("Could not load perl: %s" % dlfcn.dlerror())
+cdef void* handle
+if sys.platform.startswith('linux'):
+    # we need to reload the perl libary with RTLD_GLOBAL, because many compiled CPAN
+    # modules assume that those symbols are available. Python does not import the
+    # library's symbols into a global namespace
+    handle=dlfcn.dlopen("libperl.so",dlfcn.RTLD_LAZY|dlfcn.RTLD_GLOBAL)
+    if(not handle):
+        raise RuntimeError("Could not load perl: %s" % dlfcn.dlerror())
