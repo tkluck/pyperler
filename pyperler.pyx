@@ -324,6 +324,11 @@ for iteration:
 1
 2
 3
+
+Also nice for string quoting:
+>>> a,b,c = i['qw/a b c/']
+>>> a
+'a'
 """
 from libc.stdlib cimport malloc, free
 cimport dlfcn
@@ -807,9 +812,7 @@ cdef class ScalarValue:
         >>> i.Sa
         'def'
         """
-        cdef int length = 0
-        cdef char *perl_string = perl.SvPVutf8(self._sv, length)
-        return perl_string[:length].decode()
+        return bytes(perl.SvPV_nolen(self._sv)).decode()
 
     def __int__(self):
         return <long>perl.SvIV(self._sv)
