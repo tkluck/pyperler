@@ -571,7 +571,7 @@ cdef class LazyExpression:
         else:
             expression = str(self._expression).encode()
             return perl.newSVpvn_utf8(expression, len(expression), True)
-        
+
     def __call__(self, *args, **kwds):
         return self.result(False)(*args, **kwds)
 
@@ -1196,6 +1196,24 @@ cdef class ScalarValue:
     def values(self):
         return [v for k,v in self.items()]
 
+    def append(self, element):
+        r"""
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i('@array = 1 .. 4')
+        >>> i.Aarray.append(11)
+        >>> i.Aarray
+        [1, 2, 3, 4, 11]
+        """
+        cdef perl.AV* array_value
+        if not perl.SvROK(self._sv):
+            raise TypeError("not an array or hash")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
+            array_value = <perl.AV*>ref_value
+            perl.av_push(array_value, _new_sv_from_object(element))
+        else:
+            raise TypeError("not an array or hash")
+
     def strings(self):
         return tuple(str(_) for _ in self)
 
@@ -1377,9 +1395,11 @@ cdef class LazyCalledSub:
 import sys,os
 PERL_SYS_INIT3(sys.argv, os.environ)
 
-# we need to reload the perl libary with RTLD_GLOBAL, because many compiled CPAN
-# modules assume that those symbols are available. Python does not import the
-# library's symbols into a global namespace
-cdef void* handle=dlfcn.dlopen("libperl.so",dlfcn.RTLD_LAZY|dlfcn.RTLD_GLOBAL)
-if(not handle):
-    raise RuntimeError("Could not load perl: %s" % dlfcn.dlerror())
+cdef void* handle
+if sys.platform.startswith('linux'):
+    # we need to reload the perl libary with RTLD_GLOBAL, because many compiled CPAN
+    # modules assume that those symbols are available. Python does not import the
+    # library's symbols into a global namespace
+    handle=dlfcn.dlopen("libperl.so",dlfcn.RTLD_LAZY|dlfcn.RTLD_GLOBAL)
+    if(not handle):
+        raise RuntimeError("Could not load perl: %s" % dlfcn.dlerror())
