@@ -899,9 +899,6 @@ cdef class ScalarValue:
             # FIXME: we shouldn't allocate the keys list here
             return len(self.keys()) > 0
 
-    def __hash__(self):
-        return int(<long>self._sv)
-
     def __add__(x, y):
         """
         >>> import pyperler; i = pyperler.Interpreter()
@@ -1077,28 +1074,6 @@ cdef class ScalarValue:
             return op(type(y)(x), y)
         raise NotImplementedError()
 
-    def __hash__(self):
-        r"""
-        >>> import pyperler; i = pyperler.Interpreter()
-        >>> i.Sa = 3
-        >>> d = {i.Sa: "test"}
-        >>> d[3]
-        'test'
-        >>> i.Sb = None
-        >>> d[i.Sb] = 19
-        >>> d[None]
-        19
-        """
-        if not perl.SvOK(self._sv):
-            return hash(None)
-        if perl.SvIOK(self._sv):
-            return hash(int(self))
-        if perl.SvNOK(self._sv):
-            return hash(float(self))
-        if perl.SvROK(self._sv):
-            raise NotImplementedError("Mutable types are not hashable")
-        raise NotImplementedError()
-
     def __iter__(self):
         cdef perl.SV** scalar_value
         cdef perl.AV* array_value
@@ -1250,7 +1225,7 @@ cdef class ScalarValue:
             return [str(method) for method in Inspector.methods(classname)]
         except (ImportError, TypeError):
             return []
-        
+
 
 cdef class BoundMethod(object):
     cdef perl.SV *_sv
