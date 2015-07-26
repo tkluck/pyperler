@@ -356,7 +356,6 @@ Also nice for string quoting:
 """
 from libc.stdlib cimport malloc, free
 cimport dlfcn
-from cpython.string cimport PyString_AsString
 from cpython cimport PyObject, Py_XINCREF
 cimport perl
 
