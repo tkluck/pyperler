@@ -29,6 +29,7 @@ sub new {
 sub set_brand {
     my $self = shift;
     $self->{brand} = shift;
+    return undef
 }
 
 sub brand {

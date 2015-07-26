@@ -16,7 +16,7 @@ Python.  Using Perl stuff is as easy as:
     ...    [ "Earth", 6378, 5.52 ],
     ...    [ "Jupiter", 71030, 1.3 ],
     ... )
-    >>> for line in t.table(): print line
+    >>> print( t.table() )
     Planet  Radius Density
             km     g/cm^3 
     Mercury  2360  3.7    
@@ -42,41 +42,59 @@ Introduction
 ------------
 PyPerler allows you to seemlessly interact with Perl code from Python. Python
 dicts and Perl hashes map into eachother transparently, and so do lists and
-arrays. Perl functions and methods are called either in scalar or list context
-depending on how you use them in Python. For example:
+arrays.
 
-    >>> import pyperler
-    >>> i = pyperler.Interpreter()
-    >>> i('@array = qw / a b c /;')
+The obvious complications for bridging the differences between Python and Perl are
 
-will allow you to access `@array` in list context by doing:
+ 1. Weak typing; there's no difference between 1 and "1" in Perl
+ 2. Void context vs. scalar context vs. list context
 
-    >>> for i in i['@array']: print i
-    a
-    b
-    c
+For choosing a strategy to deal with this, we follow the Philosophy of Python:
 
-or in scalar context, returning its length, by doing:
+    Explicit is better than implicit.
+    (...)
+    In the face of ambiguity, refuse the temptation to guess.
 
-    >>> for i in range(i['@array']): print i
-    0
-    1
-    2
+Weak typing
+-----------
+Whenever we return a scalar value from Perl, this remains boxed as an object of
+type pyperler.ScalarValue.  This can either be explicitly cast to str, int, or
+double, or that can happen implicitly through type inference in binary
+operations. We 'refuse the tempation to guess' when applying a binary operator
+to a pyperler.ScalarValue: this raises a TypeError.
 
-Actually, you can also use `i.Aarray` to access the array. This is actually the
-preferred way, as it also supports setting:
+In case the scalar value is a hashref resp. an arrayref, it supports all the
+operations that Python's built-in dict object resp. list object support.
 
-    >>> i.Aarray[1] = 'd'
-    >>> list(i.Aarray)
-    ['a', 'd', 'c']
+In case the scalar value is a blessed reference, it additionally supports
+methods calls. When there's a naming clash between the Python built-in method
+and the blessed reference's methods, the Python ones take precedence. The "hidden"
+methods are still available through a indexable attribute 'F', like
 
-There is support for hashes and objects (blessed references), too. See the
-doctests for more examples.
+    >>> arrayref = i('package a; sub append { print $_[1] }; bless "a", []')
+    >>> arrayref.F['append'](23)
+    23
+
+Void context vs. scalar context vs. list context
+------------------------------------------------
+Any pyperler object that represents a Perl callable has methods `void_context`,
+`list_context`, and `scalar_context`. In addition, `__call__` (ie the function
+call operator) is a shorthand for `scalar_context`.
+
+Similarly, the Interpreter object has methods `void_context`, `list_context`,
+and `scalar_context`. They take a single string as an argument, which is evaluated
+as Perl code. `__call__` is a shorthand for `scalar_context`, and also `__getitem__`
+is a shorthand for `list_context`. (This last  thing wouldn't be useful for
+callables, because the case of zero arguments is a syntax error in Python.)
+
+`void_context` returns None
+`scalar_context` returns a pyperler.ScalarValue
+`list_context` returns a pyperler.ListValue. This is just a python tuple of pyperler.ScalarValue objects, with a few convenience methods for casting all of them.
 
 License
 -------
-PyPerler is Copyright (C) 2013, Timo Kluck. It is distributed under the General
-Public License, version 3 or later.
+PyPerler is Copyright (C) 2013-2015, Timo Kluck. It is distributed under the
+General Public License, version 3 or later.
 
 The file PythonObject.pm contains code from from PyPerl, which is Copyright
 2000-2001 ActiveState. This code can be distributed under the same terms as

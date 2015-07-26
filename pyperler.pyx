@@ -23,16 +23,17 @@ r"""
 
 Accessing scalar variables:
 >>> i("$a = 2 + 2;")
+4
 >>> i.Sa
 4
->>> i['$a']
+>>> i('$a')
 4
 >>> list(range(i.Sa))
 [0, 1, 2, 3]
 >>> i.Sa = 5
 >>> list(range(i.Sa))
 [0, 1, 2, 3, 4]
->>> i['undef']
+>>> i('undef')
 None
 
 Integer, float, and string conversions:
@@ -58,7 +59,8 @@ If we do not cast, we get a list of pyperler.ScalarValue objects. Their
 
 In scalar context, an array yields its length:
 >>> i("@array = qw / a b c d e /")
->>> int(i["@array"])
+5
+>>> i("@array")
 5
 
 which is also available from Python:
@@ -66,11 +68,12 @@ which is also available from Python:
 5
 
 Fun with Perl's secret operators:
->>> i["()= qw / a b c d e /"]
+>>> i("()= qw / a b c d e /")
 5
 
 Accessing array values:
 >>> i("@d = (10 .. 20)")
+11
 >>> i.Ad.ints()
 (10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)
 >>> i.Ad[2]
@@ -78,7 +81,7 @@ Accessing array values:
 >>> list(i.Ad)[2]
 12
 >>> i.Ad[0] = 9
->>> int(i['$d[0]'])
+>>> int(i('$d[0]'))
 9
 >>> i['@d[0..2]'].ints()
 (9, 11, 12)
@@ -91,36 +94,42 @@ Assigning iterables to arrays:
 (10, 10, 10, 10, 10)
 >>> i.Aletters = "nohtyP ni lreP"
 >>> i('@letters = reverse @letters')
+14
 >>> list(i.Aletters)
 ['P', 'e', 'r', 'l', ' ', 'i', 'n', ' ', 'P', 'y', 't', 'h', 'o', 'n']
 
 Accessing hash values:
 >>> i("%b = (greece => 'Aristotle', germany => 'Hegel');")
+4
 >>> i.Pb['greece']
 'Aristotle'
 >>> i.Pb['germany'] = 'Kant'
 >>> i('$c = $b{germany}')
+'Kant'
 >>> i.Sc
 'Kant'
 >>> i.Pparrot = {'dead': True}
->>> i["$parrot{dead}"]
+>>> i("$parrot{dead}")
 1
 
 Accessing objects (we assign to _ to discard the meaningless return values):
->>> i("unshift @INC, './perllib'")
->>> i("use Car; $car = Car->new")
->>> _ = i.Scar.set_brand("Toyota")
->>> _ = i.Scar.drive(20)
->>> i["$car->distance"]
+>>> _ = i("unshift @INC, './perllib'")
+>>> i.void_context("use Car; $car = Car->new")
+>>> i.Scar.set_brand("Toyota")
+None
+>>> i.Scar.drive(20)
+None
+>>> i("$car->distance")
 20
->>> int(i.Scar.distance())
+>>> i.Scar.distance()
 20
 >>> i.Scar.drive(20)
+None
 
 Verify that this makes the intended change to the object:
->>> i["$car->distance"]
+>>> i("$car->distance")
 40
->>> int(i.Scar.distance())
+>>> i.Scar.distance()
 40
 
 Catching perl exceptions ('die'):
@@ -131,7 +140,7 @@ RuntimeError: Out of gas! at perllib/Car.pm line ...
 <BLANKLINE>
 
 Nested structures:
->>> i("$a = { dictionary => { a => 65, b => 66 }, array => [ 4, 5, 6] }")
+>>> _ = i("$a = { dictionary => { a => 65, b => 66 }, array => [ 4, 5, 6] }")
 >>> i.Sa['dictionary']['a']
 65
 >>> i.Sa['array'][1]
@@ -144,25 +153,27 @@ Assigning non-string iterables to a nested element will create an arrayref:
 
 Similarly, assiging a dict to a nested element will create a hashref:
 >>> i.Sa['dictionary'] = {'c': 67, 'd': 68}
->>> int(i['$a->{dictionary}->{c}'])
+>>> int(i('$a->{dictionary}->{c}'))
 67
 >>> sorted(i['keys %{ $a->{dictionary} } '].strings())
 ['c', 'd']
 
 Calling subs:
 >>> i("sub do_something { for (1..10) { 2 + 2 }; return 3; }")
+None
 >>> i.Fdo_something()
 3
 >>> i("sub add_two { return $_[0] + 2; }")
+None
 >>> i.Fadd_two("4")
 6
 
 Anonymous subs:
->>> i['sub { return 2*$_[0]; }'](6)
+>>> i('sub { return 2*$_[0]; }')(6)
 12
 
 In packages:
->>> i.F['Car::all_brands']()
+>>> i.F['Car::all_brands'].list_context()
 ('Toyota', 'Nissan')
 
 Passing a Perl function as a callback to python. You'll need to
@@ -172,55 +183,65 @@ list context:
 ...     for i in range(10**5): 2 + 2
 ...     return on_ready(5)
 ...
->>> long_computation(i['sub { return 4; }'].scalar_context)
+>>> long_computation(i('sub { return 4; }').scalar_context)
 4
->>> i('sub callback { return $_[0]; }');
+>>> i('sub callback { return $_[0]; }')
+None
 >>> long_computation(i.Fcallback.scalar_context)
 5
 
 You can maintain a reference to a Perl object, without it being
 a Perl variable:
->>> car = i['Car->new'].result(False)
->>> _ = car.set_brand('Chevrolet')
->>> _ = car.drive(20)
+>>> car = i('Car->new')
+>>> car.set_brand('Chevrolet')
+None
+>>> car.drive(20)
+None
 >>> car.brand()
 'Chevrolet'
 >>> del car   # this deletes it on the Perl side, too
 
->>> i('sub p { return $_[0] ** $_[1]; }')
+>>> i('sub p { return $_[0] ** $_[1]; }');
+None
 >>> i.Fp(2,3)
 8.0
 
 But the canonical way is this:
 >>> Car = i.use('Car')
 >>> car = Car()
->>> _ = car.drive(20)
->>> _ = car.set_brand('Honda')
+>>> car.drive(20)
+None
+>>> car.set_brand('Honda');
+None
 >>> car.brand()
 'Honda'
 
 You can access class methods by calling them on the class:
->>> Car.all_brands()
+>>> Car.all_brands.list_context()
 ('Toyota', 'Nissan')
 
 You can also pass Python functions as Perl callbacks:
->>> def f(): return 3 
->>> i('sub callit { return $_[0]->() }')
+>>> def f(): return 3
+>>> i('sub callit { return $_[0]->() }');
+None
 >>> i.Fcallit(f)
 3
 >>> def g(x): return x**2
->>> i('sub pass_three { return $_[0]->(3) }')
+>>> i('sub pass_three { return $_[0]->(3) }');
+None
 >>> i.Fpass_three(g)
 9
->>> i('sub call_first { return $_[0]->($_[1]); }')
+>>> i('sub call_first { return $_[0]->($_[1]); }');
+None
 >>> i.Fcall_first(lambda x: eval(str(x)), "2+2")
 4
 
 And this even works if you switch between Perl and Python several times:
 >>> i.Fcall_first(i, "2+2") # no lock or segfault
+4
 
 And also when we don't discard the return value:
->>> def h(x): return int(i[x])
+>>> def h(x): return int(i(x))
 >>> i.Fcall_first(h, "2+2")
 4
 
@@ -240,6 +261,7 @@ Test that we recover objects when we pass them through perl
 ...         return bool(self._last_set_item)
 ...
 >>> i('sub shifter { shift; }')
+None
 >>> foobar = FooBar()
 >>> type(foobar)
 <class 'pyperler.FooBar'>
@@ -247,12 +269,13 @@ Test that we recover objects when we pass them through perl
 <class 'pyperler.FooBar'>
 
 And that indexing and getting the length works:
->>> i['sub { return $_[0]->{miss}; }'](foobar)
+>>> i('sub { return $_[0]->{miss}; }')(foobar)
 'key length: 4'
->>> i['sub { $_[0]->{funny_joke} = "dkfjasd"; return undef; }'](foobar)
->>> i['sub { return $_[0] ? "YES" : "no"; }'](foobar)
+>>> i('sub { $_[0]->{funny_joke} = "dkfjasd"; return undef; }')(foobar)
+None
+>>> i('sub { return $_[0] ? "YES" : "no"; }')(foobar)
 'YES'
->>> i['sub { return scalar@{ $_[0] }; }'](foobar)
+>>> i('sub { return scalar@{ $_[0] }; }')(foobar)
 31337
 
 >>> Table = i.use('Text::Table')
@@ -263,7 +286,7 @@ And that indexing and getting the length works:
 ...    [ "Earth", 6378, 5.52 ],
 ...    [ "Jupiter", 71030, 1.3 ],
 ... )
->>> print( t.table.scalar_context() )
+>>> print( t.table() )
 Planet  Radius Density
         km     g/cm^3 
 Mercury  2360  3.7    
@@ -278,16 +301,16 @@ Using list context:
 'beta'
 
 Test using more than 32-bits numbers:
->>> i['sub { shift; }'](2**38)
+>>> i('sub { shift; }')(2**38)
 274877906944
 
 Test using negative numbers:
->>> i['sub { shift; }'](-1)
+>>> i('sub { shift; }')(-1)
 -1
 
 Test passing blessed scalar values through Python:
 >>> i.Sdaewoo_matiz = Car()
->>> i['ref $daewoo_matiz']
+>>> i('ref $daewoo_matiz')
 'Car'
 
 We even support introspection if your local CPAN installation sports Class::Inspector:
@@ -317,7 +340,8 @@ while(my $row = $object->next) {
 for iteration:
 
 >>> i('use DummyIterable')
->>> i('$numbers = bless [1,2,3], "DummyIterable"')
+None
+>>> i.void_context('$numbers = bless [1,2,3], "DummyIterable"')
 >>> for a in i.Snumbers:
 ...     print(a)
 ...
@@ -382,6 +406,13 @@ cdef class _PerlInterpreter:
     def run(self):
         perl.perl_run(perl.my_perl)
 
+cdef perl.SV* _expression_sv(object expression):
+    if isinstance(expression, ScalarValue):
+        return perl.SvREFCNT_inc((<ScalarValue>expression)._sv)
+    else:
+        expression = str(expression).encode()
+        return perl.newSVpvn_utf8(expression, len(expression), True)
+
 cdef class Interpreter(object):
     cdef _PerlInterpreter _interpreter
     cdef object _iterable_methods
@@ -394,20 +425,61 @@ cdef class Interpreter(object):
         self._interpreter.run()
         self._iterable_methods = defaultdict(lambda: 'next')
 
-        self._is_numeric = self['sub { my $i = shift; (0+$i) == $i; }'].result(False)
-        self._is_integer = self['sub { my $i = shift; int $i == $i; }'].result(False)
-        self._ref = self['sub { ref $_[0]; }'].result(False)
+        self._is_numeric = self('sub { my $i = shift; (0+$i) == $i; }')
+        self._is_integer = self('sub { my $i = shift; int $i == $i; }')
+        self._ref = self('sub { ref $_[0]; }')
 
-    def __call__(self, code):
-        self[str(code)].result(False)
+    cdef object _eval(self, object expression, int context):
+        cdef int count
+        cdef perl.SV* expression_sv = _expression_sv(expression)
+        cdef object ret = None
+
+        perl.dSP
+        with nogil:
+            count = perl.eval_sv(expression_sv, perl.G_EVAL|context)
+        perl.SvREFCNT_dec(expression_sv)
+        perl.SPAGAIN
+
+        if(context == perl.G_ARRAY):
+            ret = [_sv_new(perl.POPs, self) for _ in range(count)]
+            ret = ListValue(reversed(ret))
+        elif(context == perl.G_SCALAR):
+            if(count):
+                for _ in range(count - 1):
+                    perl.POPs
+                ret = _sv_new(perl.POPs, self)
+            # if not count, then None is a sensible return value
+        elif(context == perl.G_VOID):
+            for _ in range(count):
+                perl.POPs
+        else:
+            raise AssertionError("Shouldn't reach here")
+        perl.PUTBACK
+        if perl.SvTRUE(perl.ERRSV):
+            raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV).decode())
+        else:
+            return ret
+
+    def void_context(self, expression):
+        return self._eval(expression, perl.G_VOID)
+
+    def scalar_context(self, expression):
+        return self._eval(expression, perl.G_SCALAR)
+
+    def list_context(self, expression):
+        return self._eval(expression, perl.G_ARRAY)
+
+    def __call__(self, expression):
+        return self._eval(expression, perl.G_SCALAR)
 
     def __getitem__(self, expression):
-        return LazyExpression(self, str(expression))
+        return self._eval(expression, perl.G_ARRAY)
 
     def __getattribute__(self, name):
         """
         >>> import pyperler; i = pyperler.Interpreter()
         >>> i('use Data::Dumper')
+        None
         >>> print( i.F['Dumper']([1, 2, 2, 3]) )
         $VAR1 = [
                   1,
@@ -535,82 +607,12 @@ cdef class PerlPackage:
         except (ImportError, TypeError):
             return []
 
-cdef class LazyExpression:
-    cdef Interpreter _interpreter
-    cdef object _expression
-    cdef bint _evaluated
-    def __init__(self, interpreter, expression):
-        self._interpreter = interpreter
-        self._expression = expression
-
-    def result(self, list_context):
-        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
-        self._evaluated = True
-
-        cdef int flag = perl.G_ARRAY if list_context else perl.G_SCALAR
-        perl.dSP
-        cdef perl.SV* expression_sv = self._expression_sv()
-        cdef int count
-        with nogil:
-            count = perl.eval_sv(expression_sv, perl.G_EVAL|flag)
-        perl.SvREFCNT_dec(expression_sv)
-        perl.SPAGAIN
-        ret = [_sv_new(perl.POPs, self._interpreter) for _ in range(count)]
-        perl.PUTBACK
-        if perl.SvTRUE(perl.ERRSV):
-            raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV).decode())
-        ret = tuple(reversed(ret))
-        if(list_context):
-            return ret
-        else:
-            return ret[0]
-
-    cdef perl.SV* _expression_sv(self):
-        if isinstance(self._expression, ScalarValue):
-            return perl.SvREFCNT_inc((<ScalarValue>self._expression)._sv)
-        else:
-            expression = str(self._expression).encode()
-            return perl.newSVpvn_utf8(expression, len(expression), True)
-
-    def __call__(self, *args, **kwds):
-        return self.result(False)(*args, **kwds)
-
-    def strings(self):
-        return tuple(str(x) for x in self)
-
+class ListValue(tuple):
     def ints(self):
         return tuple(int(x) for x in self)
 
-    def __iter__(self):
-        return iter(self.result(True))
-
-    def __str__(self):
-        return str(self.result(False))
-
-    def __int__(self):
-        return int(self.result(False))
-
-    def __repr__(self):
-        return repr(self.result(False))
-
-    def __cmp__(left, right):
-        pass
-
-    def __nonzero__(left):
-        pass
-
-    def scalar_context(self, *args, **kwds):
-        return self.result(False).scalar_context(*args, **kwds)
-
-    def list_context(self, *args, **kwds):
-        return self.result(False).list_context(*args, **kwds)
-
-    def __getattr__(self, name):
-        ret = BoundMethod()
-        ret._sv = self._expression_sv()
-        ret._method = name
-        ret._interpreter = self._interpreter
-        return ret
+    def strings(self):
+        return tuple(str(x) for x in self)
 
 cdef class LazyFunctionVariable(object):
     cdef object _name
@@ -620,13 +622,16 @@ cdef class LazyFunctionVariable(object):
         self._interpreter = interpreter
 
     def __call__(self, *args, **kwds):
-        return CalledSub_new(self._name, None, self._interpreter, <perl.SV*>0, <perl.SV*>0, args, kwds)
+        return call_sub(perl.G_SCALAR, self._name, None, self._interpreter, <perl.SV*>0, <perl.SV*>0, args, kwds)
 
     def scalar_context(self, *args, **kwds):
-        return LazyCalledSub_new(self._name, None, self._interpreter, <perl.SV*>0, <perl.SV*>0, args, kwds).result(False)
+        return call_sub(perl.G_SCALAR, self._name, None, self._interpreter, <perl.SV*>0, <perl.SV*>0, args, kwds)
 
     def list_context(self, *args, **kwds):
-        return LazyCalledSub_new(self._name, None, self._interpreter, <perl.SV*>0, <perl.SV*>0, args, kwds).result(True)
+        return call_sub(perl.G_ARRAY, self._name, None, self._interpreter, <perl.SV*>0, <perl.SV*>0, args, kwds)
+
+    def void_context(self, *args, **kwds):
+        return call_sub(perl.G_VOID, self._name, None, self._interpreter, <perl.SV*>0, <perl.SV*>0, args, kwds)
 
 cdef _sv_new(perl.SV *sv, object interpreter):
     cdef perl.MAGIC* magic
@@ -752,24 +757,31 @@ cdef class ScalarValue:
         r"""
         >>> import pyperler; i = pyperler.Interpreter()
         >>> i('$a = 3')
+        3
         >>> type(i.Sa.to_python()) is int
         True
         >>> i('@a = (1,2,3,4)')
+        4
         >>> type(i.Aa.to_python()) is list
         True
         >>> i('%a = (a => 3, b => 4)')
+        4
         >>> type(i.Ha.to_python()) is dict
         True
         >>> i('$b = undef')
+        None
         >>> type(i.Sb.to_python()) is type(None)
         True
         >>> i('$c = "4.5"')
+        '4.5'
         >>> type(i.Sc.to_python()) is float
         True
         >>> i('$d = "-4"')
+        '-4'
         >>> type(i.Sd.to_python()) is int
         True
         >>> i('$e = "-4"')
+        '-4'
         >>> type(i.Se.to_python(numeric_if_possible=False)) is str
         True
         >>> i.Se.to_python(force_scalar_to=float)
@@ -865,11 +877,12 @@ cdef class ScalarValue:
     def __nonzero__(self):
         """
         >>> import pyperler; i = pyperler.Interpreter()
-        >>> bool(i['12'].result(False))
+        >>> bool(i('12'))
         True
-        >>> bool(i['""'].result(False))
+        >>> bool(i('""'))
         False
         >>> i('@array = ()')
+        0
         >>> bool(i.Aarray)
         False
         >>> i.Aarray = [1, 2, 3]
@@ -1175,13 +1188,16 @@ cdef class ScalarValue:
             perl.hv_store(hash_value, key, len(key), _new_sv_from_object(value), 0)
 
     def __call__(self, *args, **kwds):
-        return CalledSub_new(None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds)
+        return call_sub(perl.G_SCALAR, None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds)
 
     def scalar_context(self, *args, **kwds):
-        return LazyCalledSub_new(None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds).result(False)
+        return call_sub(perl.G_SCALAR, None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds)
 
     def list_context(self, *args, **kwds):
-        return LazyCalledSub_new(None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds).result(True)
+        return call_sub(perl.G_ARRAY, None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds)
+
+    def void_context(self, *args, **kwds):
+        return call_sub(perl.G_VOID, None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds)
 
     def __getattr__(self, name):
         ret = BoundMethod()
@@ -1200,6 +1216,7 @@ cdef class ScalarValue:
         r"""
         >>> import pyperler; i = pyperler.Interpreter()
         >>> i('@array = 1 .. 4')
+        4
         >>> i.Aarray.append(11)
         >>> i.Aarray
         [1, 2, 3, 4, 11]
@@ -1241,16 +1258,19 @@ cdef class BoundMethod(object):
     cdef Interpreter _interpreter
 
     def __call__(self, *args, **kwds):
-        return CalledSub_new(None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds)
+        return call_sub(perl.G_SCALAR, None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds)
     
     def __dealloc__(self):
         perl.SvREFCNT_dec(self._sv)
 
     def scalar_context(self, *args, **kwds):
-        return LazyCalledSub_new(None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds).result(False)
+        return call_sub(perl.G_SCALAR, None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds)
 
     def list_context(self, *args, **kwds):
-        return LazyCalledSub_new(None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds).result(True)
+        return call_sub(perl.G_ARRAY, None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds)
+
+    def void_context(self, *args, **kwds):
+        return call_sub(perl.G_VOID, None, self._method, self._interpreter, <perl.SV*>0, self._sv, args, kwds)
 
     def __getattribute__(self, name):
         if name == '__doc__':
@@ -1281,117 +1301,63 @@ about its signature:
         except (ImportError, IOError):
             return "No docstring available; either Class::Inspector is not installed or the source file could not be read"
 
-cdef object CalledSub_new(object name, object method, object interpreter, perl.SV* scalar_value, perl.SV* self, object args, object kwds):
-    cdef LazyCalledSub ret = LazyCalledSub_new(name, method, interpreter, scalar_value, self, args, kwds)
-    result = ret.result(True)
-    if len(result) == 1:
-        result = result[0]
-        if isinstance(result, ScalarValue) and not result.is_defined():
-            return None
-        return result
-    return result
-
-cdef object LazyCalledSub_new(object name, object method, object interpreter, perl.SV* scalar_value, perl.SV* self, object args, object kwds):
-    cdef LazyCalledSub ret = LazyCalledSub()
-    ret._name = name
-    ret._method = method
-    ret._interpreter = interpreter
-    ret._sv = perl.SvREFCNT_inc(scalar_value)
-    ret._self = perl.SvREFCNT_inc(self)
-    ret._args = args
-    ret._kwds = kwds
-    return ret
-
-cdef class LazyCalledSub:
-    cdef object _name
-    cdef object _method
-    cdef Interpreter _interpreter
-    cdef perl.SV* _sv
-
-    cdef perl.SV *_self
-    cdef object _args
-    cdef object _kwds
-    cdef bint _evaluated
-
-    def result(self, list_context):
-        if self._evaluated: raise RuntimeError("Cannot use lazy expression multiple times")
-        self._evaluated = True
-
-        cdef int flag = perl.G_ARRAY if list_context else perl.G_SCALAR
-
+cdef object call_sub(int context, object name, object method, object interpreter, perl.SV* scalar_value, perl.SV* self, object args, object kwds):
         cdef int count
         cdef int i
-        cdef char* name
+        cdef char* name_str
+        cdef object ret = None
         perl.dSP
         perl.ENTER
-        perl.SAVETMPS 
+        perl.SAVETMPS
 
         perl.PUSHMARK(perl.SP)
-        if self._self:
-            perl.XPUSHs(self._self)
-        for arg in self._args:
+        if self:
+            perl.XPUSHs(self)
+        for arg in args:
             perl.mXPUSHs(_new_sv_from_object(arg))
-        for k,v in self._kwds.items():
+        for k,v in kwds.items():
             perl.mXPUSHs(_new_sv_from_object(k))
             perl.mXPUSHs(_new_sv_from_object(v))
         perl.PUTBACK
         try:
-            if self._self:
-                method_str = str(self._method).encode()
-                name = method_str
+            if self:
+                method_str = str(method).encode()
+                name_str = method_str
                 with nogil:
-                    count = perl.call_method(name, perl.G_EVAL|flag)
-            elif self._name:
-                name_str = str(self._name).encode()
-                name = name_str
+                    count = perl.call_method(name_str, perl.G_EVAL|context)
+            elif name:
+                name = str(name).encode()
+                name_str = name
                 with nogil:
-                    count = perl.call_pv(name, perl.G_EVAL|flag)
-            elif self._sv:
+                    count = perl.call_pv(name_str, perl.G_EVAL|context)
+            elif scalar_value:
                 with nogil:
-                    count = perl.call_sv(self._sv, perl.G_EVAL|flag)
+                    count = perl.call_sv(scalar_value, perl.G_EVAL|context)
             else:
-                raise AssertionError()
+                raise AssertionError("Shouldn't reach here")
             perl.SPAGAIN
-            ret = [_sv_new(perl.POPs, self._interpreter) for i in range(count)]
-            ret.reverse()
+
+            if context == perl.G_ARRAY:
+                ret = [_sv_new(perl.POPs, interpreter) for i in range(count)]
+                ret = tuple(reversed(ret))
+            elif context == perl.G_SCALAR:
+                if count:
+                    for _ in range(count - 1):
+                        perl.POPs
+                    ret = _sv_new(perl.POPs, interpreter)
+            elif context == perl.G_VOID:
+                for _ in range(count):
+                    perl.POPs
+
             if perl.SvTRUE(perl.ERRSV):
                 raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV).decode())
-            if list_context:
-                return tuple(ret)
             else:
-                return ret[0]
+                return ret
         finally:
             perl.PUTBACK
             perl.FREETMPS
             perl.LEAVE
 
-    def __iter__(self):
-        for r in self.result(True):
-            yield r
-
-    def strings(self):
-        return tuple(str(e) for e in self)
-
-    def ints(self):
-        return tuple(int(e) for e in self)
-
-    def __int__(self):
-        return int(self.result(False))
-
-    def __str__(self):
-        return str(self.result(False))
-
-    def __repr__(self):
-        return repr(self.result(False))
-
-    def __dealloc__(self):
-        if not self._evaluated:
-            self.result(False)
-        perl.SvREFCNT_dec(self._self)
-        perl.SvREFCNT_dec(self._sv)
-
-    def __add__(self, other):
-        return int(self) + other
 import sys,os
 PERL_SYS_INIT3(sys.argv, os.environ)
 
