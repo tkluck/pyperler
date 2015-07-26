@@ -823,7 +823,11 @@ cdef class ScalarValue:
         >>> i.Sa
         'def'
         """
+        # FIXME: check whether utf-8 flag is set, or something
         return bytes(perl.SvPV_nolen(self._sv)).decode()
+
+    def __bytes__(self):
+        return bytes(perl.SvPV_nolen(self._sv))
 
     def __int__(self):
         return <long>perl.SvIV(self._sv)
@@ -1069,7 +1073,7 @@ cdef class ScalarValue:
             raise RuntimeError("Cannot use comparison operator on two perl scalar values '%s' and '%s'. Convert either one to string or to integer" % (x, y))
         if y is None:
             return op(x.to_python(), y)
-        if isinstance(y, (int, float, str)):
+        if isinstance(y, (int, float, str, bytes)):
             return op(type(y)(x), y)
         raise NotImplementedError()
 
