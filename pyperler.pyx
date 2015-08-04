@@ -2,7 +2,7 @@
 #
 # pyperler.pyx
 #
-# Copyright (C) 2013, Timo Kluck <tkluck@infty.nl>
+# Copyright (C) 2013-2015, Timo Kluck <tkluck@infty.nl>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

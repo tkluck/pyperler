@@ -3,8 +3,8 @@ PyPerler
 
 Quick introduction
 ------------------
-PyPerler gives you the power of CPAN, and your (legacy?) perl packages, in
-Python.  Using Perl stuff is as easy as:
+PyPerler gives you the power of CPAN, and your perl packages, in Python.  Using
+Perl stuff is as easy as:
 
     >>> import pyperler; i = pyperler.Interpreter()
     >>> # use a CPAN module
@@ -38,7 +38,9 @@ Then compilation and installation is
 
     $ python setup.py build && sudo python setup.py install
 
-Introduction
+This works both for python2 and python3.
+
+Overview
 ------------
 PyPerler allows you to seemlessly interact with Perl code from Python. Python
 dicts and Perl hashes map into eachother transparently, and so do lists and
@@ -55,13 +57,21 @@ For choosing a strategy to deal with this, we follow the Philosophy of Python:
     (...)
     In the face of ambiguity, refuse the temptation to guess.
 
+On the other hand, we are not shying away from Perl's There Is More Than One Way
+To Do It. For example, these both give the same results:
+
+    >>> [int(x) for x in i["1 .. 10"]]
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    >>> i["1 .. 10"].ints()
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
 Weak typing
 -----------
 Whenever we return a scalar value from Perl, this remains boxed as an object of
-type pyperler.ScalarValue.  This can either be explicitly cast to str, int, or
-double, or that can happen implicitly through type inference in binary
+type pyperler.ScalarValue.  This can either be explicitly cast to bytes, str,
+int, or float, or that can happen implicitly through type inference in binary
 operations. We 'refuse the tempation to guess' when applying a binary operator
-to a pyperler.ScalarValue: this raises a TypeError.
+to TWO pyperler.ScalarValue instances: this raises a TypeError.
 
 In case the scalar value is a hashref resp. an arrayref, it supports all the
 operations that Python's built-in dict object resp. list object support.
@@ -69,11 +79,14 @@ operations that Python's built-in dict object resp. list object support.
 In case the scalar value is a blessed reference, it additionally supports
 methods calls. When there's a naming clash between the Python built-in method
 and the blessed reference's methods, the Python ones take precedence. The "hidden"
-methods are still available through a indexable attribute 'F', like
+methods are still available through an indexable attribute 'F', like so:
 
     >>> arrayref = i('package a; sub append { print $_[1] }; bless "a", []')
     >>> arrayref.F['append'](23)
     23
+
+NB. This F attribute hasn't been implemented yet. Neither have *all* list/dict
+methods been implemented.
 
 Void context vs. scalar context vs. list context
 ------------------------------------------------
@@ -89,7 +102,9 @@ callables, because the case of zero arguments is a syntax error in Python.)
 
 `void_context` returns None
 `scalar_context` returns a pyperler.ScalarValue
-`list_context` returns a pyperler.ListValue. This is just a python tuple of pyperler.ScalarValue objects, with a few convenience methods for casting all of them.
+`list_context` returns a pyperler.ListValue. This is just a python tuple of
+pyperler.ScalarValue objects, with a few convenience methods for casting all of
+them.
 
 License
 -------
