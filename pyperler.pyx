@@ -353,6 +353,17 @@ Also nice for string quoting:
 >>> a,b,c = i['qw/a b c/']
 >>> a
 'a'
+
+Also, creating a new interpreter works like you'd expect:
+>>> i.Sa = 3
+>>> i.Sa
+3
+>>> i = pyperler.Interpreter()
+>>> i.Sa
+Traceback (most recent call last):
+...
+NameError: name '$a' is not defined
+
 """
 from libc.stdlib cimport malloc, free
 cimport dlfcn
