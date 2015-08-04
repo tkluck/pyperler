@@ -1221,6 +1221,9 @@ cdef class ScalarValue:
     def ints(self):
         return tuple(int(_) for _ in self)
 
+    def floats(self):
+        return tuple(float(_) for _ in self)
+
     def blessed_package(self):
         ref = str(self._interpreter._ref(self))
         if ref != 'HASH' and ref != 'ARRAY':
@@ -1234,6 +1237,137 @@ cdef class ScalarValue:
             return [str(method) for method in Inspector.methods(classname)]
         except (ImportError, TypeError):
             return []
+
+    def clear(self):
+        r"""
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i('@array = 1 .. 4')
+        4
+        >>> i.Aarray.clear()
+        >>> i.Aarray
+        []
+        >>> i('%hash= (a => 1)')
+        2
+        >>> i.Hhash.clear()
+        >>> i.Hhash
+        {}
+        """
+        cdef perl.SV* ref_value
+        cdef perl.AV* array_value
+        cdef perl.HV* hash_value
+        if not perl.SvROK(self._sv):
+            raise TypeError("not an array or hash")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
+            array_value = <perl.AV*>ref_value
+            perl.av_clear(array_value)
+        elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
+            hash_value = <perl.HV*>ref_value
+            perl.hv_clear(hash_value)
+        else:
+            raise TypeError("not an array or hash")
+
+    def copy(self):
+        r"""
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i('@array = (1 .. 4)')
+        4
+        >>> a= i.Aarray.copy()
+        >>> a[0]= 0
+        >>> a
+        [0, 2, 3, 4]
+        >>> i.Aarray
+        [1, 2, 3, 4]
+        >>> i('%hash= (a => 1)')
+        2
+        >>> h= i.Hhash.copy()
+        >>> h['a']= 2
+        >>> i.Hhash['a']
+        1
+        """
+        cdef perl.SV* ref_value
+        if not perl.SvROK(self._sv):
+            raise TypeError("not an array or hash")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
+            return list(self)
+        elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
+            return { k: v for k,v in self.items() }
+        else:
+            raise TypeError("not an array or hash")
+
+    def count(self, value):
+        r"""
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i('@array = (1,1,1,2,3)')
+        5
+        >>> i.Aarray.count(1)
+        3
+        """
+        cdef perl.SV* ref_value
+        if not perl.SvROK(self._sv):
+            raise TypeError("not an array")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
+            cnt= 0
+            for x in self:
+                if x == value:
+                    cnt+= 1
+            return cnt
+        else:
+            raise TypeError("not an array")
+
+    def extend(self, iterable):
+        r"""
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i('@array = (1 .. 4)')
+        4
+        >>> i.Aarray.extend(range(5,7))
+        >>> i.Aarray
+        [1, 2, 3, 4, 5, 6]
+        """
+        cdef perl.SV* ref_value
+        if not perl.SvROK(self._sv):
+            raise TypeError("not an array")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
+            for x in iterable:
+                self.append(x)
+        else:
+            raise TypeError("not an array")
+
+    def index(self, value, start=None, stop=None):
+        r"""
+        >>> import pyperler; i = pyperler.Interpreter()
+        >>> i('@array = (1 .. 4)')
+        4
+        >>> i.Aarray.index(3)
+        2
+        >>> i.Aarray.index(3, 1)
+        2
+        >>> i.Aarray.index(3, 1, 4)
+        2
+        >>> i.Aarray.index(3, 1, 1) # doctest: +ELLIPSIS
+        Traceback (most recent call last):
+        ...
+        ValueError: 3 is not in list
+        """
+        cdef perl.SV* ref_value
+        if not perl.SvROK(self._sv):
+            raise TypeError("not an array")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
+            if start is None:
+                start= 0
+            if stop is None:
+                stop= len(self)
+            for ix in range(start, stop):
+                if self[ix] == value:
+                    return ix
+            raise ValueError("%s is not in list" % value)
+        else:
+            raise TypeError("not an array")
+
 
 
 cdef class BoundMethod(object):
