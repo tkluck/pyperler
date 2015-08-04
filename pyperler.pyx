@@ -513,11 +513,11 @@ cdef class Interpreter(object):
                 raise NameError("name '%%%s' is not defined" % name[1:])
         elif initial == 'F':
             if len(name) > 1:
-                return LazyFunctionVariable(self, name[1:])
+                return FunctionAttribute(self, name[1:])
             else:
                 class FunctionLookup(object):
                     def __getitem__(this, key):
-                        return LazyFunctionVariable(self, key)
+                        return FunctionAttribute(self, key)
                 return FunctionLookup()
         elif name == 'use':
             def perl_package_constructor(*args, **kwds):
@@ -610,10 +610,13 @@ class ListValue(tuple):
     def ints(self):
         return tuple(int(x) for x in self)
 
+    def floats(self):
+        return tuple(float(x) for x in self)
+
     def strings(self):
         return tuple(str(x) for x in self)
 
-cdef class LazyFunctionVariable(object):
+cdef class FunctionAttribute(object):
     cdef object _name
     cdef Interpreter _interpreter
     def __init__(self, interpreter, name):
@@ -726,7 +729,7 @@ cdef class ScalarValue:
     >>> i.Sa == i.Sb
     Traceback (most recent call last):
     ...
-    RuntimeError: Cannot use comparison operator on two perl scalar values '3' and '3'. Convert either one to string or to integer
+    TypeError: Cannot use comparison operator on two perl scalar values '3' and '3'. Convert either one to string or to integer
     >>> i.Sa == 3
     True
     >>> 3 == i.Sb
@@ -1070,7 +1073,7 @@ cdef class ScalarValue:
         import operator
         op = { 0: operator.lt, 2: operator.eq, 4: operator.gt, 1: operator.le, 3: operator.ne, 5: operator.ge}[operation]
         if isinstance(y, ScalarValue):
-            raise RuntimeError("Cannot use comparison operator on two perl scalar values '%s' and '%s'. Convert either one to string or to integer" % (x, y))
+            raise TypeError("Cannot use comparison operator on two perl scalar values '%s' and '%s'. Convert either one to string or to integer" % (x, y))
         if y is None:
             return op(x.to_python(), y)
         if isinstance(y, (int, float, str, bytes)):
