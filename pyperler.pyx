@@ -852,7 +852,7 @@ cdef class ScalarValue:
                 if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
                     return repr(list(self))
                 else:
-                    return repr(self.dict())
+                    return repr(self.to_dict())
             if perl.SvIOK(self._sv):
                 return repr(int(self))
             if perl.SvNOK(self._sv):
@@ -1192,6 +1192,9 @@ cdef class ScalarValue:
 
     def values(self):
         return [v for k,v in self.items()]
+
+    def to_dict(self):
+        return {k: v for k,v in self.items()}
 
     def append(self, element):
         r"""
