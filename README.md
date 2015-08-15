@@ -81,12 +81,11 @@ methods calls. When there's a naming clash between the Python built-in method
 and the blessed reference's methods, the Python ones take precedence. The "hidden"
 methods are still available through an indexable attribute 'F', like so:
 
-    >>> arrayref = i('package a; sub append { print $_[1] }; bless "a", []')
+    >>> arrayref = i('package a; sub append { 42 }; bless [], "a"')
     >>> arrayref.F['append'](23)
-    23
+    42
 
-NB. This F attribute hasn't been implemented yet. Neither have *all* list/dict
-methods been implemented.
+NB. Not *all* list/dict methods been implemented.
 
 Void context vs. scalar context vs. list context
 ------------------------------------------------

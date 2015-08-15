@@ -1192,11 +1192,28 @@ cdef class ScalarValue:
         return call_sub(perl.G_VOID, None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds)
 
     def __getattr__(self, name):
-        ret = BoundMethod()
-        ret._sv = perl.SvREFCNT_inc(self._sv)
-        ret._method = name
-        ret._interpreter = self._interpreter
-        return ret
+        """
+        >>> import pyperler; i= pyperler.Interpreter()
+        >>> arrayref = i('package a; sub append { 42 }; bless [], "a"')
+        >>> arrayref.append(23)
+        >>> arrayref.F['append'](23)
+        42
+        """
+        if name == 'F':
+            class Indexable:
+                def __getitem__(this, function_name):
+                    ret = BoundMethod()
+                    ret._sv = perl.SvREFCNT_inc(self._sv)
+                    ret._method = function_name
+                    ret._interpreter = self._interpreter
+                    return ret
+            return Indexable()
+        else:
+            ret = BoundMethod()
+            ret._sv = perl.SvREFCNT_inc(self._sv)
+            ret._method = name
+            ret._interpreter = self._interpreter
+            return ret
 
     def keys(self):
         return [k for k,v in self.items()]
