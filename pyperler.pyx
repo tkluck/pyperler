@@ -364,10 +364,15 @@ Traceback (most recent call last):
 ...
 NameError: name '$a' is not defined
 
+Deal with null-bytes in perl strings:
+>>> a = bytes(i('"a\\x00b"'))
+>>> len(a)
+3
+
 """
 from libc.stdlib cimport malloc, free
 cimport dlfcn
-from cpython cimport PyObject, Py_XINCREF
+from cpython cimport PyObject, Py_XINCREF, PY_MAJOR_VERSION
 cimport perl
 
 from collections import defaultdict
@@ -837,11 +842,14 @@ cdef class ScalarValue:
         >>> i.Sa
         'def'
         """
-        # FIXME: check whether utf-8 flag is set, or something
-        return bytes(perl.SvPV_nolen(self._sv)).decode()
+        cdef size_t length = 0
+        cdef char *buffer = perl.SvPVutf8(self._sv, length)
+        return bytes(buffer[:length]).decode()
 
     def __bytes__(self):
-        return bytes(perl.SvPV_nolen(self._sv))
+        cdef size_t length = 0
+        cdef char *buffer = perl.SvPVbyte(self._sv, length)
+        return bytes(buffer[:length])
 
     def __int__(self):
         return <long>perl.SvIV(self._sv)
@@ -856,6 +864,7 @@ cdef class ScalarValue:
         return int(self)**e
 
     def __repr__(self):
+        cdef size_t length = 0
         cdef perl.SV* ref_value
         if perl.SvOK(self._sv):
             if perl.SvROK(self._sv):
@@ -869,7 +878,14 @@ cdef class ScalarValue:
             if perl.SvNOK(self._sv):
                 return repr(float(self))
             else:
-                return repr(str(self))
+                b = bytes(self)
+                if PY_MAJOR_VERSION < 3:
+                    return repr(b)
+                else:
+                    try:
+                        return repr(b.decode())
+                    except UnicodeDecodeError as e:
+                        return repr(b)
         else:
             return 'None'
 
