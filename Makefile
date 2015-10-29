@@ -11,3 +11,6 @@ check: pyperler
 
 clean:
 	rm -rf build pyperler.c lib
+
+install: pyperler
+	$(PYTHON) setup.py install
