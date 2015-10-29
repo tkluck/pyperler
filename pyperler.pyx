@@ -534,6 +534,8 @@ cdef class Interpreter(object):
                 class FunctionLookup(object):
                     def __getitem__(this, key):
                         return FunctionAttribute(self, key)
+                    def __call__(this, key):
+                        raise RuntimeError("You can't use .F(...); use .F[...] instead")
                 return FunctionLookup()
         elif name == 'use':
             def perl_package_constructor(*args, **kwds):
