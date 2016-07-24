@@ -369,6 +369,33 @@ Deal with null-bytes in perl strings:
 >>> len(a)
 3
 
+Check that we have all python's array methods on an arrayref:
+>>> a = i("[1,2,3,4,5,6]")
+>>> a.append(7)
+>>> a
+[1, 2, 3, 4, 5, 6, 7]
+>>> b = a.copy()
+>>> b.append(7)
+>>> a,b
+([1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7, 7])
+>>> a.count(7), b.count(7)
+(1, 2)
+>>> a.clear(); a
+[]
+>>> a= i("[1,2,3,4,5,6,7]")
+>>> a.extend((x**3 for x in range(2,4))); a
+[1, 2, 3, 4, 5, 6, 7, 8, 27]
+>>> a.index(27)
+8
+>>> a.insert(8,9); a
+[1, 2, 3, 4, 5, 6, 7, 8, 9, 27]
+>>> a.pop(), a
+(27, [1, 2, 3, 4, 5, 6, 7, 8, 9])
+>>> a.pop(2), a
+(3, [1, 2, 4, 5, 6, 7, 8, 9])
+>>> a.remove(2); a
+[1, 4, 5, 6, 7, 8, 9]
+
 """
 from libc.stdlib cimport malloc, free
 cimport dlfcn
@@ -1414,6 +1441,61 @@ cdef class ScalarValue:
         else:
             raise TypeError("not an array")
 
+    def insert(self, index, value):
+        cdef perl.SV* ref_value
+        if not perl.SvROK(self._sv):
+            raise TypeError("not an array")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) != perl.SVt_PVAV:
+            raise TypeError("not an array")
+        cdef perl.AV* array_value = <perl.AV*>ref_value
+        cdef int old_size = perl.av_top_index(array_value) + 1
+        cdef int new_size = old_size + 1
+        perl.av_fill(array_value, perl.av_top_index(array_value)+1)
+        cdef int i
+        cdef perl.SV** tmp
+        for i in range(1, old_size - index + 1):
+            tmp= perl.av_fetch(array_value, old_size - i, False)
+            perl.SvREFCNT_inc(tmp[0])
+            perl.av_store(array_value, new_size - i, tmp[0])
+        perl.av_store(array_value, min(index, old_size), _new_sv_from_object(value))
+
+    def pop(self, index=None):
+        cdef perl.SV* ref_value
+        if not perl.SvROK(self._sv):
+            raise TypeError("not an array")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) != perl.SVt_PVAV:
+            raise TypeError("not an array")
+        cdef perl.AV* array_value = <perl.AV*>ref_value
+
+        # can't use perl.av_pop because it has different
+        # semantics for empty arrays / index out of range
+        if(index is None):
+            index = len(self) - 1
+        if index >= len(self):
+            raise IndexError("Index out of bounds")
+
+        cdef int old_size = perl.av_top_index(array_value) + 1
+        cdef int new_size = old_size - 1
+        cdef int i
+        cdef perl.SV** tmp
+
+        tmp= perl.av_fetch(array_value, index, False)
+        cdef object ret= _sv_new(tmp[0], self._interpreter)
+        for i in range(0, new_size - index):
+            tmp= perl.av_fetch(array_value, index + i + 1, False)
+            perl.SvREFCNT_inc(tmp[0])
+            perl.av_store(array_value, index + i, tmp[0])
+        perl.av_fill(array_value, new_size - 1)
+
+        return ret
+
+    def remove(self, value):
+        try:
+            self.pop(self.index(value))
+        except IndexError:
+            raise ValueError("Value not found")
 
 
 cdef class BoundMethod(object):
