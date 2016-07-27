@@ -478,8 +478,8 @@ cdef class Interpreter(object):
         self._interpreter.run()
         self._iterable_methods = defaultdict(lambda: 'next')
 
-        self._is_numeric = self('sub { my $i = shift; (0+$i) == $i; }')
-        self._is_integer = self('sub { my $i = shift; int $i == $i; }')
+        self._is_numeric = self('sub { my $i = shift; (0+$i) eq $i; }')
+        self._is_integer = self('sub { my $i = shift; int $i eq $i; }')
         self._ref = self('sub { ref $_[0]; }')
 
     cdef object _eval(self, object expression, int context):
@@ -844,6 +844,12 @@ cdef class ScalarValue:
         True
         >>> i.Se.to_python(force_scalar_to=float)
         -4.0
+        >>> i('$f = "hello, world"')
+        'hello, world'
+        >>> i.Sf.to_python()
+        'hello, world'
+        >>> i.Sf.to_python(force_scalar_to=int)
+        0
         """
         cdef perl.SV* ref_value
         if not perl.SvOK(self._sv):
@@ -864,8 +870,7 @@ cdef class ScalarValue:
                     return int(self)
                 else:
                     return float(self)
-        else:
-            return str(self)
+        return str(self)
 
     def __str__(self):
         u"""
