@@ -395,6 +395,17 @@ Check that we have all python's array methods on an arrayref:
 (3, [1, 2, 4, 5, 6, 7, 8, 9])
 >>> a.remove(2); a
 [1, 4, 5, 6, 7, 8, 9]
+>>> a.reverse(); a
+[9, 8, 7, 6, 5, 4, 1]
+
+We cannot directly compare scalar values, because we don't
+know whether you want string or number comparison. You can
+make that explicit by specifying a key:
+>>> a.append(10)
+>>> a.sort(key=int); a
+[1, 4, 5, 6, 7, 8, 9, 10]
+>>> a.sort(key=str); a
+['1', '10', '4', '5', '6', '7', '8', '9']
 
 """
 from libc.stdlib cimport malloc, free
@@ -1496,6 +1507,61 @@ cdef class ScalarValue:
             self.pop(self.index(value))
         except IndexError:
             raise ValueError("Value not found")
+
+    def reverse(self):
+        cdef perl.SV* ref_value
+        if not perl.SvROK(self._sv):
+            raise TypeError("not an array")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) != perl.SVt_PVAV:
+            raise TypeError("not an array")
+        cdef perl.AV* array_value = <perl.AV*>ref_value
+
+        cdef size_t size = perl.av_top_index(array_value)+1
+        cdef perl.SV** left
+        cdef perl.SV** right
+        cdef perl.SV* tmp
+        cdef size_t i
+        for i in range(size>>1):
+            left= perl.av_fetch(array_value, i, False)
+            right= perl.av_fetch(array_value, size - 1 - i, False)
+            tmp= left[0]
+            left[0]= right[0]
+            right[0]= tmp
+
+    def sort(self, key=None, reverse=False):
+        cdef perl.SV* ref_value
+        if not perl.SvROK(self._sv):
+            raise TypeError("not an array")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) != perl.SVt_PVAV:
+            raise TypeError("not an array")
+        cdef perl.AV* array_value = <perl.AV*>ref_value
+
+        def sort_key(ix):
+            if key:
+                return key(self[ix])
+            else:
+                return self[ix]
+
+        indices= list(range(len(self)))
+        indices.sort(key=sort_key, reverse=reverse)
+
+        to_permute=set(range(len(self)))
+        cdef perl.SV** target
+        cdef perl.SV** source
+        cdef perl.SV* temp
+        while to_permute:
+            ix= to_permute.pop()
+            target= perl.av_fetch(array_value, ix, False)
+            temp= target[0]
+            while indices[ix] in to_permute:
+                source= perl.av_fetch(array_value, indices[ix], False)
+                target[0]= source[0]
+                target= source
+                ix = indices[ix]
+                to_permute.remove(ix)
+            target[0]= temp
 
 
 cdef class BoundMethod(object):
