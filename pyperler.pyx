@@ -34,7 +34,7 @@ Accessing scalar variables:
 >>> list(range(i.Sa))
 [0, 1, 2, 3, 4]
 >>> i('undef')
-None
+<pyperler.undef>
 
 Integer, float, and string conversions:
 >>> i.Sb = 2.3
@@ -116,15 +116,15 @@ Accessing objects (we assign to _ to discard the meaningless return values):
 >>> _ = i("unshift @INC, './perllib'")
 >>> i.void_context("use Car; $car = Car->new")
 >>> i.Scar.set_brand("Toyota")
-None
+<pyperler.undef>
 >>> i.Scar.drive(20)
-None
+<pyperler.undef>
 >>> i("$car->distance")
 20
 >>> i.Scar.distance()
 20
 >>> i.Scar.drive(20)
-None
+<pyperler.undef>
 
 Verify that this makes the intended change to the object:
 >>> i("$car->distance")
@@ -160,11 +160,11 @@ Similarly, assiging a dict to a nested element will create a hashref:
 
 Calling subs:
 >>> i("sub do_something { for (1..10) { 2 + 2 }; return 3; }")
-None
+<pyperler.undef>
 >>> i.Fdo_something()
 3
 >>> i("sub add_two { return $_[0] + 2; }")
-None
+<pyperler.undef>
 >>> i.Fadd_two("4")
 6
 
@@ -186,7 +186,7 @@ list context:
 >>> long_computation(i('sub { return 4; }').scalar_context)
 4
 >>> i('sub callback { return $_[0]; }')
-None
+<pyperler.undef>
 >>> long_computation(i.Fcallback.scalar_context)
 5
 
@@ -194,15 +194,15 @@ You can maintain a reference to a Perl object, without it being
 a Perl variable:
 >>> car = i('Car->new')
 >>> car.set_brand('Chevrolet')
-None
+<pyperler.undef>
 >>> car.drive(20)
-None
+<pyperler.undef>
 >>> car.brand()
 'Chevrolet'
 >>> del car   # this deletes it on the Perl side, too
 
 >>> i('sub p { return $_[0] ** $_[1]; }');
-None
+<pyperler.undef>
 >>> i.Fp(2,3)
 8.0
 
@@ -210,9 +210,9 @@ But the canonical way is this:
 >>> Car = i.use('Car')
 >>> car = Car()
 >>> car.drive(20)
-None
+<pyperler.undef>
 >>> car.set_brand('Honda');
-None
+<pyperler.undef>
 >>> car.brand()
 'Honda'
 
@@ -223,16 +223,16 @@ You can access class methods by calling them on the class:
 You can also pass Python functions as Perl callbacks:
 >>> def f(): return 3
 >>> i('sub callit { return $_[0]->() }');
-None
+<pyperler.undef>
 >>> i.Fcallit(f)
 3
 >>> def g(x): return x**2
 >>> i('sub pass_three { return $_[0]->(3) }');
-None
+<pyperler.undef>
 >>> i.Fpass_three(g)
 9
 >>> i('sub call_first { return $_[0]->($_[1]); }');
-None
+<pyperler.undef>
 >>> i.Fcall_first(lambda x: eval(str(x)), "2+2")
 4
 
@@ -261,7 +261,7 @@ Test that we recover objects when we pass them through perl
 ...         return bool(self._last_set_item)
 ...
 >>> i('sub shifter { shift; }')
-None
+<pyperler.undef>
 >>> foobar = FooBar()
 >>> type(foobar)
 <class 'pyperler.FooBar'>
@@ -272,7 +272,7 @@ And that indexing and getting the length works:
 >>> i('sub { return $_[0]->{miss}; }')(foobar)
 'key length: 4'
 >>> i('sub { $_[0]->{funny_joke} = "dkfjasd"; return undef; }')(foobar)
-None
+<pyperler.undef>
 >>> i('sub { return $_[0] ? "YES" : "no"; }')(foobar)
 'YES'
 >>> i('sub { return scalar@{ $_[0] }; }')(foobar)
@@ -340,7 +340,7 @@ while(my $row = $object->next) {
 for iteration:
 
 >>> i('use DummyIterable')
-None
+<pyperler.undef>
 >>> i.void_context('$numbers = bless [1,2,3], "DummyIterable"')
 >>> for a in i.Snumbers:
 ...     print(a)
@@ -532,7 +532,7 @@ cdef class Interpreter(object):
         """
         >>> import pyperler; i = pyperler.Interpreter()
         >>> i('use Data::Dumper')
-        None
+        <pyperler.undef>
         >>> print( i.F['Dumper']([1, 2, 2, 3]) )
         $VAR1 = [
                   1,
@@ -827,7 +827,7 @@ cdef class ScalarValue:
         >>> type(i.Ha.to_python()) is dict
         True
         >>> i('$b = undef')
-        None
+        <pyperler.undef>
         >>> type(i.Sb.to_python()) is type(None)
         True
         >>> i('$c = "4.5"')
@@ -932,7 +932,7 @@ cdef class ScalarValue:
                     except UnicodeDecodeError as e:
                         return repr(b)
         else:
-            return 'None'
+            return '<pyperler.undef>'
 
     def is_defined(self):
         return perl.SvOK(self._sv)
