@@ -120,6 +120,7 @@ cdef extern from "perl.h":
     SV* hv_iternextsv(HV *hv, char **key, int *retlen)
     void hv_clear(HV* hash_value)
     void hv_store(HV* hash_value, char *key, int strlen, SV* scalar_value, int hash)
+    SV* hv_delete(HV* hash_value, char *key, int strlen, int flags)
 
     int PL_exit_flags
     int PERL_EXIT_DESTRUCT_END

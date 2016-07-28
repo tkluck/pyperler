@@ -176,7 +176,7 @@ In packages:
 >>> i.F['Car::all_brands'].list_context()
 ('Toyota', 'Nissan')
 
-Passing a Perl function as a callback to python. You'll need to
+Passing a Perl function as a callback to python. Yo'll need to
 specify whether you want it to evaluate in scalar context or
 list context:
 >>> def long_computation(on_ready):
@@ -354,7 +354,7 @@ Also nice for string quoting:
 >>> a
 'a'
 
-Also, creating a new interpreter works like you'd expect:
+Also, creating a new interpreter works like yo'd expect:
 >>> i.Sa = 3
 >>> i.Sa
 3
@@ -406,6 +406,45 @@ make that explicit by specifying a key:
 [1, 4, 5, 6, 7, 8, 9, 10]
 >>> a.sort(key=str); a
 ['1', '10', '4', '5', '6', '7', '8', '9']
+>>> b=[1,2,3,2,3,4,8,5,0,1]
+>>> b.sort(key=int); b
+[0, 1, 1, 2, 2, 3, 3, 4, 5, 8]
+
+Dictionary methods on hashrefs:
+>>> a = i("{ foo => 3, bar => 4 }")
+>>> b = a.copy(); b["baz"] = 5
+>>> b["baz"]
+5
+>>> a.get('bar')
+4
+>>> a.get('baz', 'not found')
+'not found'
+>>> sorted(a.items())
+[('bar', 4), ('foo', 3)]
+>>> sorted(a.keys())
+['bar', 'foo']
+>>> a.pop('foo')
+3
+>>> sorted(a.keys())
+['bar']
+>>> a.popitem()
+('bar', 4)
+>>> a
+{}
+>>> a.setdefault('baz', 6)
+6
+>>> a.setdefault('baz', 7)
+6
+>>> sorted(a.keys())
+['baz']
+>>> a.update(foo=3, bar=4)
+>>> sorted(a.items())
+[('bar', 4), ('baz', 6), ('foo', 3)]
+>>> sorted(a.values(), key=int)
+[3, 4, 6]
+>>> a.clear()
+>>> a
+{}
 
 """
 from libc.stdlib cimport malloc, free
@@ -1240,6 +1279,20 @@ cdef class ScalarValue:
             key = str(key).encode()
             perl.hv_store(hash_value, key, len(key), _new_sv_from_object(value), 0)
 
+    def __delitem__(self, key):
+        cdef perl.SV** scalar_value
+        cdef perl.AV* array_value
+        cdef perl.HV* hash_value
+        cdef perl.SV* ref_value
+        if not perl.SvROK(self._sv):
+            raise TypeError("not a hash")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) != perl.SVt_PVHV:
+            raise TypeError("not a hash")
+        hash_value = <perl.HV*>ref_value
+        key = str(key).encode()
+        perl.hv_delete(hash_value, key, len(key), perl.G_DISCARD)
+
     def __call__(self, *args, **kwds):
         return call_sub(perl.G_SCALAR, None, None, self._interpreter, self._sv, <perl.SV*>0, args, kwds)
 
@@ -1476,36 +1529,51 @@ cdef class ScalarValue:
             perl.av_store(array_value, new_size - i, tmp[0])
         perl.av_store(array_value, min(index, old_size), _new_sv_from_object(value))
 
-    def pop(self, index=None):
+    def pop(self, index=None, default=None):
         cdef perl.SV* ref_value
-        if not perl.SvROK(self._sv):
-            raise TypeError("not an array")
-        ref_value = perl.SvRV(self._sv)
-        if perl.SvTYPE(ref_value) != perl.SVt_PVAV:
-            raise TypeError("not an array")
-        cdef perl.AV* array_value = <perl.AV*>ref_value
-
-        # can't use perl.av_pop because it has different
-        # semantics for empty arrays / index out of range
-        if(index is None):
-            index = len(self) - 1
-        if index >= len(self):
-            raise IndexError("Index out of bounds")
-
-        cdef int old_size = perl.av_top_index(array_value) + 1
-        cdef int new_size = old_size - 1
+        cdef perl.AV* array_value
+        cdef int old_size
+        cdef int new_size
         cdef int i
         cdef perl.SV** tmp
+        cdef object ret
+        if not perl.SvROK(self._sv):
+            raise TypeError("not a reference")
+        ref_value = perl.SvRV(self._sv)
+        if perl.SvTYPE(ref_value) == perl.SVt_PVAV:
+            array_value = <perl.AV*>ref_value
 
-        tmp= perl.av_fetch(array_value, index, False)
-        cdef object ret= _sv_new(tmp[0], self._interpreter)
-        for i in range(0, new_size - index):
-            tmp= perl.av_fetch(array_value, index + i + 1, False)
-            perl.SvREFCNT_inc(tmp[0])
-            perl.av_store(array_value, index + i, tmp[0])
-        perl.av_fill(array_value, new_size - 1)
+            # can't use perl.av_pop because it has different
+            # semantics for empty arrays / index out of range
+            if(index is None):
+                index = len(self) - 1
+            if index >= len(self):
+                raise IndexError("Index out of bounds")
 
-        return ret
+            old_size = perl.av_top_index(array_value) + 1
+            new_size = old_size - 1
+
+            tmp= perl.av_fetch(array_value, index, False)
+            ret= _sv_new(tmp[0], self._interpreter)
+            for i in range(0, new_size - index):
+                tmp= perl.av_fetch(array_value, index + i + 1, False)
+                perl.SvREFCNT_inc(tmp[0])
+                perl.av_store(array_value, index + i, tmp[0])
+            perl.av_fill(array_value, new_size - 1)
+
+            return ret
+        elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
+            if index in self:
+                value= self[index]
+                del self[index]
+                return value
+            else:
+                if default is None:
+                    raise KeyError("key '%s' not found" % index)
+                else:
+                    return default
+        else:
+            raise TypeError("not a hash or array reference")
 
     def remove(self, value):
         try:
@@ -1567,6 +1635,34 @@ cdef class ScalarValue:
                 ix = indices[ix]
                 to_permute.remove(ix)
             target[0]= temp
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def popitem(self):
+        for key, value in self.items():
+            del self[key]
+            return key, value
+        raise KeyError("Called popitem on empty hash")
+
+    def setdefault(self, key, default):
+        if key not in self:
+            self[key]= default
+        return self[key]
+
+    def update(self, other=None, **kwds):
+        if other is not None:
+            if hasattr(other, 'keys'):
+                for key in other.keys():
+                    self[key]= other[key]
+            else:
+                for key, value in other:
+                    self[key]= value
+        for key, value in kwds.items():
+            self[key]= value
 
 
 cdef class BoundMethod(object):
