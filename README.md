@@ -85,8 +85,6 @@ methods are still available through an indexable attribute 'F', like so:
     >>> arrayref.F['append'](23)
     42
 
-NB. Not *all* list/dict methods been implemented.
-
 Void context vs. scalar context vs. list context
 ------------------------------------------------
 Any pyperler object that represents a Perl callable has methods `void_context`,
