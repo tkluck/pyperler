@@ -811,9 +811,9 @@ cdef perl.SV *_new_sv_from_object(object value):
             return perl.newSVpvn_utf8(value, len(value), True)
         elif isinstance(value, bool):
             if value:
-                return perl.newSViv(1)
+                return &perl.PL_sv_yes
             else:
-                return perl.newSVpvn_utf8('', 0, True)
+                return &perl.PL_sv_no
         elif isinstance(value, dict):
             hash_value = perl.newHV()
             for k, v in value.items():

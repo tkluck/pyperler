@@ -187,6 +187,8 @@ cdef extern from "perl.h":
     void newXS(char* name, void* fn, char* filename)
 
     SV PL_sv_undef
+    SV PL_sv_yes
+    SV PL_sv_no
 
     void boot_DynaLoader (CV* cv)
 
