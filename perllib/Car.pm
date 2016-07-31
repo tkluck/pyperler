@@ -56,4 +56,10 @@ sub out_of_gas {
     die "Out of gas!";
 }
 
+our $destroyed_cars= 0;
+
+sub DESTROY {
+    $destroyed_cars++;
+}
+
 1; # satisfy require

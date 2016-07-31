@@ -198,7 +198,11 @@ a Perl variable:
 <pyperler.undef>
 >>> car.brand()
 'Chevrolet'
+>>> i('$Car::destroyed_cars')
+0
 >>> del car   # this deletes it on the Perl side, too
+>>> i('$Car::destroyed_cars')
+1
 
 >>> i('sub p { return $_[0] ** $_[1]; }');
 <pyperler.undef>
@@ -315,10 +319,10 @@ Test passing blessed scalar values through Python:
 We even support introspection if your local CPAN installation sports Class::Inspector:
 >>> Inspector = i.use('Class::Inspector') # this line is not needed, but if it fails you know you need to install Class::Inspector
 >>> Car.__dir__()
-['all_brands', 'brand', 'distance', 'drive', 'new', 'out_of_gas', 'set_brand']
+['DESTROY', 'all_brands', 'brand', 'distance', 'drive', 'new', 'out_of_gas', 'set_brand']
 >>> nissan_sunny = Car()
 >>> nissan_sunny.__dir__()
-['all_brands', 'brand', 'distance', 'drive', 'new', 'out_of_gas', 'set_brand']
+['DESTROY', 'all_brands', 'brand', 'distance', 'drive', 'new', 'out_of_gas', 'set_brand']
 
 Fail gracefully when a variable doesn't exist:
 >>> i.Snon_existing_variable
@@ -444,6 +448,40 @@ Dictionary methods on hashrefs:
 >>> a.clear()
 >>> a
 {}
+
+Ensure proper refcounting even when marshalling back and forth
+>>> Car = i.use('Car')
+>>> i('$Car::destroyed_cars = 0')
+0
+>>> car = Car()
+
+Pass it to a Perl function:
+>>> i('sub { }')(car)
+<pyperler.undef>
+>>> del car
+>>> i('$Car::destroyed_cars')
+1
+
+Pass it to a python callback:
+>>> car = Car()
+>>> i('sub { $_[0]->($_[1]) }')(lambda x: 0, car)
+0
+>>> del car
+>>> i('$Car::destroyed_cars')
+2
+
+Have a reference both in Python and in Perl:
+>>> car = i("$car = Car->new")
+>>> i('sub { }')(car, i.Scar)
+<pyperler.undef>
+>>> i('sub { $_[0]->($_[1], $_[2]) }')(lambda x, y: 0, car, i.Scar)
+0
+>>> i.Scar = None
+>>> i('$Car::destroyed_cars')
+2
+>>> del car
+>>> i('$Car::destroyed_cars')
+3
 
 """
 from libc.stdlib cimport malloc, free
