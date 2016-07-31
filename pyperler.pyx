@@ -582,7 +582,7 @@ cdef class Interpreter(object):
                 ];
         <BLANKLINE>
         """
-        initial = name[0].upper()
+        initial = name[0]
         cdef perl.SV *scalar_value
         cdef perl.AV *array_value
         cdef perl.HV *hash_value
@@ -623,7 +623,7 @@ cdef class Interpreter(object):
             return object.__getattribute__(self, name)
 
     def __dir__(self):
-        return ['use', 'A', 'P', 'H', 'F']
+        return ['use', 'A', 'P', 'H', 'F', 'S', 'D']
 
     def __setattr__(self, name, value):
         """
