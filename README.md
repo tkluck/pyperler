@@ -23,6 +23,7 @@ Perl stuff is as easy as:
     Venus    6110  5.1    
     Earth    6378  5.52   
     Jupiter 71030  1.3    
+    <BLANKLINE>
 
 If you install the `Class::Inspector` CPAN package, then PyPerler will even get
 you introspection for use in IPython.
@@ -63,7 +64,7 @@ To Do It. For example, these both give the same results:
     >>> [int(x) for x in i["1 .. 10"]]
     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     >>> i["1 .. 10"].ints()
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 
 Weak typing
 -----------
