@@ -526,6 +526,7 @@ cdef class Interpreter(object):
         cdef perl.SV* expression_sv = _expression_sv(expression)
         cdef object ret = None
 
+        perl.SAVETMPS
         perl.dSP
         with nogil:
             count = perl.eval_sv(expression_sv, perl.G_EVAL|context)
@@ -533,19 +534,20 @@ cdef class Interpreter(object):
         perl.SPAGAIN
 
         if(context == perl.G_ARRAY):
-            ret = [_sv_new(perl.POPs, self) for _ in range(count)]
+            ret = [_sv_new(perl.SvREFCNT_inc(perl.POPs), self) for _ in range(count)]
             ret = ListValue(reversed(ret))
         elif(context == perl.G_SCALAR):
             if(count):
                 for _ in range(count - 1):
                     perl.POPs
-                ret = _sv_new(perl.POPs, self)
+                ret = _sv_new(perl.SvREFCNT_inc(perl.POPs), self)
             # if not count, then None is a sensible return value
         elif(context == perl.G_VOID):
             for _ in range(count):
                 perl.POPs
         else:
             raise AssertionError("Shouldn't reach here")
+        perl.FREETMPS
         perl.PUTBACK
         if perl.SvTRUE(perl.ERRSV):
             raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV).decode())
@@ -589,7 +591,7 @@ cdef class Interpreter(object):
         if initial in 'SD':
             scalar_value = perl.get_sv(short_name, 0)
             if scalar_value:
-                return _sv_new(scalar_value, self)
+                return _sv_new(perl.SvREFCNT_inc(scalar_value), self)
             else:
                 raise NameError("name '$%s' is not defined" % name[1:])
         elif initial == 'A':
@@ -741,7 +743,7 @@ cdef _sv_new(perl.SV *sv, object interpreter):
     if sv:
         ret = ScalarValue()
         ret._interpreter = interpreter
-        ret._sv = perl.SvREFCNT_inc(sv)
+        ret._sv = sv
         return ret
     else:
         return None
@@ -1235,7 +1237,7 @@ cdef class ScalarValue:
             count = perl.hv_iterinit(hash_value)
             for i in range(count):
                 sv = perl.hv_iternextsv(hash_value, &key, &retlen)
-                yield bytes(key).decode(), _sv_new(sv, self._interpreter)
+                yield bytes(key).decode(), _sv_new(perl.SvREFCNT_inc(sv), self._interpreter)
         else:
             raise TypeError("not a hash")
 
@@ -1251,7 +1253,7 @@ cdef class ScalarValue:
             array_value = <perl.AV*>ref_value
             scalar_value = perl.av_fetch(array_value, key, False)
             if scalar_value:
-                return _sv_new(scalar_value[0], self._interpreter)
+                return _sv_new(perl.SvREFCNT_inc(scalar_value[0]), self._interpreter)
             else:
                 raise IndexError(key)
         elif perl.SvTYPE(ref_value) == perl.SVt_PVHV:
@@ -1259,7 +1261,7 @@ cdef class ScalarValue:
             key = str(key).encode()
             scalar_value = perl.hv_fetch(hash_value, key, len(key), False)
             if scalar_value:
-                return _sv_new(scalar_value[0], self._interpreter)
+                return _sv_new(perl.SvREFCNT_inc(scalar_value[0]), self._interpreter)
             else:
                 raise KeyError(key)
         
@@ -1554,7 +1556,7 @@ cdef class ScalarValue:
             new_size = old_size - 1
 
             tmp= perl.av_fetch(array_value, index, False)
-            ret= _sv_new(tmp[0], self._interpreter)
+            ret= _sv_new(perl.SvREFCNT_inc(tmp[0]), self._interpreter)
             for i in range(0, new_size - index):
                 tmp= perl.av_fetch(array_value, index + i + 1, False)
                 perl.SvREFCNT_inc(tmp[0])
@@ -1691,7 +1693,8 @@ cdef class BoundMethod(object):
     def _docstring(self, name):
         try:
             Inspector = self._interpreter.use('Class::Inspector')
-            classname = str(self._interpreter['sub { ref $_[0] || $_[0]; }'](_sv_new(self._sv, self._interpreter)))
+            sv_object= _sv_new(perl.SvREFCNT_inc(self._sv), self._interpreter)
+            classname = str(self._interpreter['sub { ref $_[0] || $_[0]; }'](sv_object))
             filename = str(Inspector.loaded_filename(classname))
             result = """Documentation for method %s in package %s
 
@@ -1749,13 +1752,13 @@ cdef object call_sub(int context, object name, object method, object interpreter
             perl.SPAGAIN
 
             if context == perl.G_ARRAY:
-                ret = [_sv_new(perl.POPs, interpreter) for i in range(count)]
+                ret = [_sv_new(perl.SvREFCNT_inc(perl.POPs), interpreter) for i in range(count)]
                 ret = tuple(reversed(ret))
             elif context == perl.G_SCALAR:
                 if count:
                     for _ in range(count - 1):
                         perl.POPs
-                    ret = _sv_new(perl.POPs, interpreter)
+                    ret = _sv_new(perl.SvREFCNT_inc(perl.POPs), interpreter)
             elif context == perl.G_VOID:
                 for _ in range(count):
                     perl.POPs
