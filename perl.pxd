@@ -99,6 +99,7 @@ cdef extern from "perl.h":
     void SvREADONLY(SV* scalar_value)
     void SvSetSV_nosteal(SV* dsv, SV* ssv)
     void SvSetSV(SV* dsv, SV* ssv)
+    void SvSetMagicSV(SV* dsv, SV* ssv)
 
     NV SvNV(SV* scalar_value)
     bint SvNV_set(SV* scalar_value, NV value)

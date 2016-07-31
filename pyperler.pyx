@@ -808,15 +808,15 @@ cdef perl.SV *_new_sv_from_object(object value):
 
 cdef _assign_sv(perl.SV *sv, object value):
     if value is None:
-        sv = &perl.PL_sv_undef
+        perl.SvSetMagicSV(sv, &perl.PL_sv_undef)
     elif isinstance(value, int):
-        perl.SvSetSV(sv, perl.newSViv(value))
+        perl.SvSetMagicSV(sv, perl.sv_2mortal(perl.newSViv(value)))
     elif isinstance(value, float):
-        perl.SvSetSV(sv, perl.newSVnv(value))
+        perl.SvSetMagicSV(sv, perl.sv_2mortal(perl.newSVnv(value)))
     elif isinstance(value, ScalarValue):
-        perl.SvSetSV_nosteal(sv, (<ScalarValue>value)._sv)
+        perl.SvSetMagicSV(sv, (<ScalarValue>value)._sv)
     else:
-        perl.SvSetSV(sv, _new_sv_from_object(value))
+        perl.SvSetMagicSV(sv, perl.sv_2mortal(_new_sv_from_object(value)))
 
 cdef class ScalarValue:
     """
