@@ -1611,12 +1611,10 @@ cdef class ScalarValue:
             raise TypeError("not an array")
         cdef perl.AV* array_value = <perl.AV*>ref_value
 
-        def sort_key(ix):
-            if key:
-                return key(self[ix])
-            else:
-                return self[ix]
-
+        if key is not None:
+            sort_key = lambda ix: key(self[ix])
+        else:
+            sort_key = lambda ix: self[ix]
         indices= list(range(len(self)))
         indices.sort(key=sort_key, reverse=reverse)
 
