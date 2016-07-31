@@ -112,8 +112,7 @@ Accessing hash values:
 >>> i("$parrot{dead}")
 1
 
-Accessing objects (we assign to _ to discard the meaningless return values):
->>> _ = i("unshift @INC, './perllib'")
+Accessing objects
 >>> i.void_context("use Car; $car = Car->new")
 >>> i.Scar.set_brand("Toyota")
 <pyperler.undef>
@@ -136,7 +135,7 @@ Catching perl exceptions ('die'):
 >>> i.Scar.out_of_gas() # doctest: +ELLIPSIS
 Traceback (most recent call last):
 ...
-RuntimeError: Out of gas! at perllib/Car.pm line ...
+RuntimeError: Out of gas! at ...perllib/Car.pm line ...
 <BLANKLINE>
 
 Nested structures:

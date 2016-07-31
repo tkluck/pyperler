@@ -7,7 +7,7 @@ pyperler: pyperler.pyx perl.pxd setup.py
 
 check: pyperler
 	$(PYTHON) setup.py install --install-lib="`pwd`/lib"
-	PYTHONPATH="`pwd`/lib" $(PYTHON) test.py
+	PERL5LIB="`pwd`/perllib" PYTHONPATH="`pwd`/lib" $(PYTHON) test.py
 
 clean:
 	rm -rf build pyperler.c lib
