@@ -270,6 +270,8 @@ Test that we recover objects when we pass them through perl
 <class 'pyperler.FooBar'>
 >>> type(i.Fshifter(FooBar()))
 <class 'pyperler.FooBar'>
+>>> id(foobar) == id(i.Fshifter(foobar))
+True
 
 And that indexing and getting the length works:
 >>> i('sub { return $_[0]->{miss}; }')(foobar)
