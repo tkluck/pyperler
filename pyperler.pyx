@@ -802,7 +802,9 @@ cdef perl.SV *_new_sv_from_object(object value):
     cdef perl.MAGIC* magic
 
     try:
-        if isinstance(value, int):
+        if value is None:
+            return &perl.PL_sv_undef
+        elif isinstance(value, int):
             return perl.newSViv(value)
         elif isinstance(value, float):
             return perl.newSVnv(value)
