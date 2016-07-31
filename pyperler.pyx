@@ -776,6 +776,7 @@ cdef _sv_new(perl.SV *sv, object interpreter):
         magic = perl.mg_find(sv, <int>('~'))
         if(magic and magic[0].mg_virtual == &virtual_table):
             obj = <object><void*>perl.SvIVX(sv)
+            Py_INCREF(obj)
             return obj
     if sv:
         ret = ScalarValue()
