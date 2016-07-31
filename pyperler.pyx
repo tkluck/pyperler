@@ -486,7 +486,7 @@ Have a reference both in Python and in Perl:
 """
 from libc.stdlib cimport malloc, free
 cimport dlfcn
-from cpython cimport PyObject, Py_XINCREF, PY_MAJOR_VERSION
+from cpython cimport PyObject, Py_INCREF, Py_DECREF, PY_MAJOR_VERSION
 cimport perl
 
 from collections import defaultdict
@@ -787,7 +787,7 @@ cdef _sv_new(perl.SV *sv, object interpreter):
 
 cdef int _free(perl.SV* sv, perl.MAGIC* mg):
     obj = <object><void*>perl.SvIVX(sv)
-    del obj
+    Py_DECREF(obj)
     return 0
 
 cdef perl.MGVTBL virtual_table
@@ -799,7 +799,6 @@ cdef perl.SV *_new_sv_from_object(object value):
 
     cdef perl.AV* array_value
     cdef perl.HV* hash_value
-    
     cdef perl.MAGIC* magic
 
     try:
@@ -831,7 +830,7 @@ cdef perl.SV *_new_sv_from_object(object value):
         else:
             ref_value = perl.newSV(0);
             scalar_value = perl.newSVrv(ref_value, "Python::Object");
-            Py_XINCREF(<PyObject*>value)
+            Py_INCREF(value)
             perl.SvIV_set(scalar_value, <perl.IV><void*>value)
             
             perl.sv_magic(scalar_value, scalar_value, <int>('~'), <char*>0, 0)
