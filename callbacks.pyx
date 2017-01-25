@@ -28,7 +28,7 @@ cdef void call_object(perl.CV* p1, perl.CV* p2) with gil:
         perl.XSRETURN(0)
 
     try:
-        args = [_sv_new(perl.stack[i], None) for i in xrange(1, perl.items)]
+        args = [_sv_to_python(perl.stack[i], None) for i in xrange(1, perl.items)]
         obj_ptr = <void*>perl.SvIVX(perl.SvRV(perl.stack[0]))
         if obj_ptr:
             obj = <object>obj_ptr
@@ -114,7 +114,7 @@ cdef void object_get_item(perl.CV* p1, perl.CV* p2) with gil:
         perl.XSRETURN(0)
 
     try:
-        args = [_sv_new(perl.SvREFCNT_inc(perl.stack[i]), None) for i in xrange(1, perl.items)]
+        args = [_sv_to_python(perl.SvREFCNT_inc(perl.stack[i]), None) for i in xrange(1, perl.items)]
         obj_ptr = <void*>perl.SvIVX(perl.SvRV(perl.stack[0]))
         if obj_ptr:
             obj = <object>obj_ptr
@@ -144,7 +144,7 @@ cdef void object_set_item(perl.CV* p1, perl.CV* p2) with gil:
         perl.XSRETURN(0)
 
     try:
-        args = [_sv_new(perl.SvREFCNT_inc(perl.stack[i]), None) for i in xrange(1, perl.items)]
+        args = [_sv_to_python(perl.SvREFCNT_inc(perl.stack[i]), None) for i in xrange(1, perl.items)]
         obj_ptr = <void*>perl.SvIVX(perl.SvRV(perl.stack[0]))
         if obj_ptr:
             obj = <object>obj_ptr
@@ -171,7 +171,7 @@ cdef void object_del_item(perl.CV* p1, perl.CV* p2) with gil:
         perl.XSRETURN(0)
 
     try:
-        args = [_sv_new(perl.SvREFCNT_inc(perl.stack[i]), None) for i in xrange(1, perl.items)]
+        args = [_sv_to_python(perl.SvREFCNT_inc(perl.stack[i]), None) for i in xrange(1, perl.items)]
         obj_ptr = <void*>perl.SvIVX(perl.SvRV(perl.stack[0]))
         if obj_ptr:
             obj = <object>obj_ptr
