@@ -171,12 +171,15 @@ cdef extern from "perl.h":
     bint SvTRUE(SV *scalar_value)
     SV *ERRSV
 
+    # TODO: die for non-threaded perl. Even better:
+    # support both.
+    ctypedef void* tTHX
     ctypedef struct MGVTBL:
-        int (*svt_get)(SV* sv, MAGIC* mg)
-        int (*svt_set)(SV* sv, MAGIC* mg)
-        int (*svt_len)(SV* sv, MAGIC* mg)
-        int (*svt_clear)(SV* sv, MAGIC* mg)
-        int (*svt_free)(SV* sv, MAGIC* mg)
+        int (*svt_get)(tTHX hx, SV* sv, MAGIC* mg)
+        int (*svt_set)(tTHX hx, SV* sv, MAGIC* mg)
+        int (*svt_len)(tTHX hx, SV* sv, MAGIC* mg)
+        int (*svt_clear)(tTHX hx, SV* sv, MAGIC* mg)
+        int (*svt_free)(tTHX hx, SV* sv, MAGIC* mg)
 
     ctypedef struct MAGIC:
         MGVTBL* mg_virtual

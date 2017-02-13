@@ -788,7 +788,7 @@ cdef _sv_to_python(perl.SV *sv, object interpreter):
     else:
         return None
 
-cdef int _free(perl.SV* sv, perl.MAGIC* mg):
+cdef int _free(perl.tTHX hx, perl.SV* sv, perl.MAGIC* mg):
     obj = <object><void*>perl.SvIVX(sv)
     Py_DECREF(obj)
     return 0
