@@ -821,9 +821,9 @@ cdef perl.SV *_new_sv_from_object(object value):
             return perl.newSVpvn_utf8(value, len(value), True)
         elif isinstance(value, bool):
             if value:
-                return &perl.PL_sv_yes
+                return perl.SvREFCNT_inc(&perl.PL_sv_yes)
             else:
-                return &perl.PL_sv_no
+                return perl.SvREFCNT_inc(&perl.PL_sv_no)
         elif isinstance(value, dict):
             hash_value = perl.newHV()
             for k, v in value.items():
@@ -847,10 +847,10 @@ cdef perl.SV *_new_sv_from_object(object value):
             magic = perl.mg_find(scalar_value, <int>('~'))
             magic[0].mg_virtual = &virtual_table
 
-            #perl.SvREADONLY(scalar_value)
+            perl.SvREADONLY(scalar_value)
             return ref_value
     except:
-        return &perl.PL_sv_undef
+        return perl.SvREFCNT_inc(&perl.PL_sv_undef)
 
 cdef _assign_sv(perl.SV *sv, object value):
     if value is None:
