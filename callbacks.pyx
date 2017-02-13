@@ -149,9 +149,7 @@ cdef void object_set_item(perl.CV* p1, perl.CV* p2) with gil:
         if obj_ptr:
             obj = <object>obj_ptr
             obj[args[0]] = args[1]
-            ret = None
-            perl.stack[0] = perl.sv_2mortal(_new_sv_from_object(ret))
-            perl.XSRETURN(1)
+            perl.XSRETURN(0)
         else:
             raise RuntimeError("Not a python object")
     except:
@@ -176,9 +174,7 @@ cdef void object_del_item(perl.CV* p1, perl.CV* p2) with gil:
         if obj_ptr:
             obj = <object>obj_ptr
             del obj[args[0]]
-            ret = None
-            perl.stack[0] = perl.sv_2mortal(_new_sv_from_object(ret))
-            perl.XSRETURN(1)
+            perl.XSRETURN(0)
         else:
             raise RuntimeError("Not a python object")
     except:
@@ -205,8 +201,7 @@ cdef void object_length(perl.CV* p1, perl.CV* p2) with gil:
         obj_ptr = <void*>perl.SvIVX(perl.SvRV(perl.stack[0]))
         if obj_ptr:
             obj = <object>obj_ptr
-            ret = len(obj)
-            perl.stack[0] = perl.sv_2mortal(_new_sv_from_object(ret))
+            perl.stack[0] = perl.sv_2mortal(perl.newSViv(len(obj)))
             perl.XSRETURN(1)
         else:
             raise RuntimeError("Not a python object")
@@ -233,8 +228,10 @@ cdef void object_is_mapping(perl.CV* p1, perl.CV* p2) with gil:
         obj_ptr = <void*>perl.SvIVX(perl.SvRV(perl.stack[0]))
         if obj_ptr:
             obj = <object>obj_ptr
-            ret = hasattr(type(obj), '__getitem__')
-            perl.stack[0] = perl.sv_2mortal(_new_sv_from_object(ret))
+            if hasattr(type(obj), '__getitem__'):
+                perl.stack[0] = perl.sv_2mortal(&perl.PL_sv_yes)
+            else:
+                perl.stack[0] = perl.sv_2mortal(&perl.PL_sv_no)
             perl.XSRETURN(1)
         else:
             raise RuntimeError("Not a python object")
