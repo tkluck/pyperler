@@ -798,8 +798,14 @@ cdef int _free(perl.tTHX hx, perl.SV* sv, perl.MAGIC* mg):
     Py_DECREF(obj)
     return 0
 
+cdef int _set(perl.tTHX hx, perl.SV* sv, perl.MAGIC* mg):
+    obj = <object><void*>perl.SvIVX(sv)
+    Py_INCREF(obj)
+    return 0
+
 cdef perl.MGVTBL virtual_table
 virtual_table.svt_free = _free
+virtual_table.svt_set  = _set
 
 cdef perl.SV *_new_sv_from_object(object value):
     cdef perl.SV* scalar_value
