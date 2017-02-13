@@ -771,15 +771,20 @@ cdef class FunctionAttribute(object):
     def void_context(self, *args, **kwds):
         return call_sub(perl.G_VOID, self._name, None, self._interpreter, <perl.SV*>0, <perl.SV*>0, args, kwds)
 
-cdef _sv_to_python(perl.SV *sv, object interpreter):
+cdef object _sv_to_python(perl.SV *sv, object interpreter):
     cdef perl.MAGIC* magic
+    cdef perl.SV* reffed
     if(perl.SvROK(sv) and perl.sv_derived_from(sv, "Python::Object")):
-        sv = perl.SvRV(sv)
-        magic = perl.mg_find(sv, <int>('~'))
+        reffed = perl.SvRV(sv)
+        magic = perl.mg_find(reffed, <int>('~'))
         if(magic and magic[0].mg_virtual == &virtual_table):
-            obj = <object><void*>perl.SvIVX(sv)
+            obj = <object><void*>perl.SvIVX(reffed)
             Py_INCREF(obj)
+            perl.SvREFCNT_dec(sv)
             return obj
+        else:
+            raise AssertionError("should be unreachable")
+            return None
     if sv:
         ret = ScalarValue()
         ret._interpreter = interpreter
