@@ -424,27 +424,27 @@ Dictionary methods on hashrefs:
 4
 >>> a.get('baz', 'not found')
 'not found'
->>> sorted(a.items())
-[('bar', 4), ('foo', 3)]
->>> sorted(a.keys())
-['bar', 'foo']
+>>> sorted(a.items()) == [('bar', 4), ('foo', 3)]
+True
+>>> sorted(a.keys()) == ['bar', 'foo']
+True
 >>> a.pop('foo')
 3
->>> sorted(a.keys())
-['bar']
->>> a.popitem()
-('bar', 4)
+>>> sorted(a.keys()) == ['bar']
+True
+>>> a.popitem() == ('bar', 4)
+True
 >>> a
 {}
 >>> a.setdefault('baz', 6)
 6
 >>> a.setdefault('baz', 7)
 6
->>> sorted(a.keys())
-['baz']
+>>> sorted(a.keys()) == ['baz']
+True
 >>> a.update(foo=3, bar=4)
->>> sorted(a.items())
-[('bar', 4), ('baz', 6), ('foo', 3)]
+>>> sorted(a.items()) == [('bar', 4), ('baz', 6), ('foo', 3)]
+True
 >>> sorted(a.values(), key=int)
 [3, 4, 6]
 >>> a.clear()
