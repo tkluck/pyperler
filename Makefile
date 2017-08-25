@@ -5,12 +5,15 @@ PYTHON ?= python
 pyperler: pyperler.pyx perl.pxd setup.py
 	$(PYTHON) setup.py build
 
-check: pyperler
-	$(PYTHON) setup.py install --install-lib="`pwd`/lib"
-	PERL5LIB="`pwd`/perllib" PYTHONPATH="`pwd`/lib" $(PYTHON) test.py
+env:
+	virtualenv -p $(PYTHON) env
+
+check: pyperler env
+	env/bin/python setup.py install
+	(cd env && PERL5LIB="../perllib" bin/python ../test.py)
 
 clean:
-	rm -rf build pyperler.c lib
+	rm -rf build pyperler.c env
 
 install: pyperler
 	$(PYTHON) setup.py install
