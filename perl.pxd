@@ -23,9 +23,6 @@ cdef extern from "EXTERN.h":
     pass
 
 cdef extern from "XSUB.h":
-    int dMARK
-    int dAX
-    int dITEMS
     int items
     void XSRETURN(int count)
     SV **stack
@@ -136,16 +133,8 @@ cdef extern from "perl.h":
 
     int GV_ADD
 
-    int dSP
-    int SPAGAIN
-    int ENTER
-    int SAVETMPS
     SV** SP
     int PUSHMARK(SV** SP)
-    int PUTBACK
-    int FREETMPS
-    int LEAVE
-    int XSprePUSH
 
     void mXPUSHi(int value)
     void XPUSHs(SV* scalar_value)
@@ -195,3 +184,15 @@ cdef extern from "perl.h":
 
     void boot_DynaLoader (CV* cv)
 
+cdef extern from "macrocompat.h":
+    void stmt_dSP()
+    void stmt_dMARK()
+    void stmt_dAX()
+    void stmt_dITEMS()
+    void stmt_SPAGAIN()
+    void stmt_ENTER()
+    void stmt_SAVETMPS()
+    void stmt_PUTBACK()
+    void stmt_FREETMPS()
+    void stmt_LEAVE()
+    void stmt_XSprePUSH()

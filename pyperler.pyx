@@ -565,12 +565,12 @@ cdef class Interpreter(object):
         cdef perl.SV* expression_sv = _expression_sv(expression)
         cdef object ret = None
 
-        perl.SAVETMPS
-        perl.dSP
+        perl.stmt_SAVETMPS()
+        perl.stmt_dSP()
         with nogil:
             count = perl.eval_sv(expression_sv, perl.G_EVAL|context)
         perl.SvREFCNT_dec(expression_sv)
-        perl.SPAGAIN
+        perl.stmt_SPAGAIN()
 
         if(context == perl.G_ARRAY):
             ret = [_sv_to_python(perl.SvREFCNT_inc(perl.POPs), self) for _ in range(count)]
@@ -586,8 +586,8 @@ cdef class Interpreter(object):
                 perl.POPs
         else:
             raise AssertionError("Shouldn't reach here")
-        perl.FREETMPS
-        perl.PUTBACK
+        perl.stmt_FREETMPS()
+        perl.stmt_PUTBACK()
         if perl.SvTRUE(perl.ERRSV):
             raise RuntimeError(perl.SvPVutf8_nolen(perl.ERRSV).decode())
         else:
@@ -1772,9 +1772,9 @@ cdef object call_sub(int context, object name, object method, object interpreter
         cdef int i
         cdef char* name_str
         cdef object ret = None
-        perl.dSP
-        perl.ENTER
-        perl.SAVETMPS
+        perl.stmt_dSP()
+        perl.stmt_ENTER()
+        perl.stmt_SAVETMPS()
 
         perl.PUSHMARK(perl.SP)
         if self:
@@ -1784,7 +1784,7 @@ cdef object call_sub(int context, object name, object method, object interpreter
         for k,v in kwds.items():
             perl.mXPUSHs(_new_sv_from_object(k))
             perl.mXPUSHs(_new_sv_from_object(v))
-        perl.PUTBACK
+        perl.stmt_PUTBACK()
         try:
             if self:
                 method_str = str(method).encode()
@@ -1801,7 +1801,7 @@ cdef object call_sub(int context, object name, object method, object interpreter
                     count = perl.call_sv(scalar_value, perl.G_EVAL|context)
             else:
                 raise AssertionError("Shouldn't reach here")
-            perl.SPAGAIN
+            perl.stmt_SPAGAIN()
 
             if context == perl.G_ARRAY:
                 ret = [_sv_to_python(perl.SvREFCNT_inc(perl.POPs), interpreter) for i in range(count)]
@@ -1820,9 +1820,9 @@ cdef object call_sub(int context, object name, object method, object interpreter
             else:
                 return ret
         finally:
-            perl.PUTBACK
-            perl.FREETMPS
-            perl.LEAVE
+            perl.stmt_PUTBACK()
+            perl.stmt_FREETMPS()
+            perl.stmt_LEAVE()
 
 import sys,os
 PERL_SYS_INIT3(sys.argv, os.environ)
