@@ -60,7 +60,7 @@ cdef extern from "perl.h":
     bint perl_parse(PerlInterpreter *interpreter, XSINIT_t xsinit, int argc, char** argv, char** env)
     bint perl_run(PerlInterpreter *interpreter)
 
-    void croak(char* message)
+    void croak(char* message, ...)
 
     SV *eval_pv(char *code, bint croak_on_error) nogil
     int eval_sv(SV *scalar_value, int flags) nogil
