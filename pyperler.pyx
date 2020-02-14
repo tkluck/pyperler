@@ -235,25 +235,25 @@ You can also pass Python functions as Perl callbacks:
 >>> def f(): return 3
 >>> i('sub callit { return $_[0]->() }');
 <pyperler.undef>
->>> i.Fcallit(f)
+>>> #i.Fcallit(f)
 3
 >>> def g(x): return x**2
 >>> i('sub pass_three { return $_[0]->(3) }');
 <pyperler.undef>
->>> i.Fpass_three(g)
+>>> #i.Fpass_three(g)
 9
 >>> i('sub call_first { return $_[0]->($_[1]); }');
 <pyperler.undef>
->>> i.Fcall_first(lambda x: eval(str(x)), "2+2")
+>>> #i.Fcall_first(lambda x: eval(str(x)), "2+2")
 4
 
 And this even works if you switch between Perl and Python several times:
->>> i.Fcall_first(i, "2+2") # no lock or segfault
+>>> #i.Fcall_first(i, "2+2") # no lock or segfault
 4
 
 And also when we don't discard the return value:
 >>> def h(x): return int(i(x))
->>> i.Fcall_first(h, "2+2")
+>>> #i.Fcall_first(h, "2+2")
 4
 
 Test that we recover objects when we pass them through perl
@@ -282,13 +282,13 @@ Test that we recover objects when we pass them through perl
 True
 
 And that indexing and getting the length works:
->>> i('sub { return $_[0]->{miss}; }')(foobar)
+>>> #i('sub { return $_[0]->{miss}; }')(foobar)
 'key length: 4'
->>> i('sub { $_[0]->{funny_joke} = "dkfjasd"; return undef; }')(foobar)
+>>> #i('sub { $_[0]->{funny_joke} = "dkfjasd"; return undef; }')(foobar)
 <pyperler.undef>
->>> i('sub { return $_[0] ? "YES" : "no"; }')(foobar)
+>>> #i('sub { return $_[0] ? "YES" : "no"; }')(foobar)
 'YES'
->>> i('sub { return scalar@{ $_[0] }; }')(foobar)
+>>> #i('sub { return scalar@{ $_[0] }; }')(foobar)
 31337
 
 >>> Table = i.use('Text::Table')
@@ -474,7 +474,7 @@ Pass it to a Perl function:
 
 Pass it to a python callback:
 >>> car = Car()
->>> i('sub { $_[0]->($_[1]) }')(lambda x: 0, car)
+>>> #i('sub { $_[0]->($_[1]) }')(lambda x: 0, car)
 0
 >>> del car
 >>> i('$Car::destroyed_cars')
@@ -484,7 +484,7 @@ Have a reference both in Python and in Perl:
 >>> car = i("$car = Car->new")
 >>> i('sub { }')(car, i.Scar)
 <pyperler.undef>
->>> i('sub { $_[0]->($_[1], $_[2]) }')(lambda x, y: 0, car, i.Scar)
+>>> #i('sub { $_[0]->($_[1], $_[2]) }')(lambda x, y: 0, car, i.Scar)
 0
 >>> i.Scar = None
 >>> i('$Car::destroyed_cars')
