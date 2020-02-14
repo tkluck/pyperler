@@ -1,6 +1,5 @@
 language: python
 python:
-  - "3.4"
   - "3.5"
   - "3.6"
   - "3.7"
@@ -9,9 +8,9 @@ python:
   - "nightly"
 # command to install dependencies
 install:
-  #- pip install -r requirements.txt
-  - apt-get install libperl-dev
-  - cpan install Text::Table
+  - pip install -r requirements.txt
+  - sudo apt-get install libperl-dev cpanminus
+  - sudo cpanm --notest Text::Table Class::Inspector
 # command to run tests
 script:
   - make check
