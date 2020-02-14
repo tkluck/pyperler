@@ -575,7 +575,7 @@ cdef class Interpreter(object):
 
         perl.stmt_SAVETMPS()
         perl.stmt_dSP()
-        with nogil:
+        for _ in ["nogil"]: # with nogil:
             count = perl.eval_sv(expression_sv, perl.G_EVAL|context)
         perl.SvREFCNT_dec(expression_sv)
         perl.stmt_SPAGAIN()
@@ -1800,15 +1800,15 @@ cdef object call_sub(int context, object name, object method, object interpreter
             if self:
                 method_str = str(method).encode()
                 name_str = method_str
-                with nogil:
+                for _ in ["nogil"]: # with nogil:
                     count = perl.call_method(name_str, perl.G_EVAL|context)
             elif name:
                 name = str(name).encode()
                 name_str = name
-                with nogil:
+                for _ in ["nogil"]: # with nogil:
                     count = perl.call_pv(name_str, perl.G_EVAL|context)
             elif scalar_value:
-                with nogil:
+                for _ in ["nogil"]: # with nogil:
                     count = perl.call_sv(scalar_value, perl.G_EVAL|context)
             else:
                 raise AssertionError("Shouldn't reach here")

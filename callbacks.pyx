@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-cdef void call_object(perl.CV* p1, perl.CV* p2) with gil:
+cdef void call_object(perl.CV* p1, perl.CV* p2): # with gil:
     perl.stmt_dSP()
     perl.stmt_dMARK()
     perl.stmt_dAX()
@@ -45,7 +45,7 @@ cdef void call_object(perl.CV* p1, perl.CV* p2) with gil:
             perl.croak("Unhandled exception in call_object")
 
 
-cdef void object_to_str(perl.CV* p1, perl.CV* p2) with gil:
+cdef void object_to_str(perl.CV* p1, perl.CV* p2): # with gil:
     perl.stmt_dSP()
     perl.stmt_dMARK()
     perl.stmt_dAX()
@@ -73,7 +73,7 @@ cdef void object_to_str(perl.CV* p1, perl.CV* p2) with gil:
         else:
             perl.croak("Unhandled exception in object_to_str")
 
-cdef void object_to_bool(perl.CV* p1, perl.CV* p2) with gil:
+cdef void object_to_bool(perl.CV* p1, perl.CV* p2): # with gil:
     perl.stmt_dSP()
     perl.stmt_dMARK()
     perl.stmt_dAX()
@@ -101,7 +101,7 @@ cdef void object_to_bool(perl.CV* p1, perl.CV* p2) with gil:
         else:
             perl.croak("Unhandled exception in object_to_bool")
 
-cdef void object_get_item(perl.CV* p1, perl.CV* p2) with gil:
+cdef void object_get_item(perl.CV* p1, perl.CV* p2): # with gil:
     perl.stmt_dSP()
     perl.stmt_dMARK()
     perl.stmt_dAX()
@@ -131,7 +131,7 @@ cdef void object_get_item(perl.CV* p1, perl.CV* p2) with gil:
             perl.croak("Unhandled exception in object_get_item")
 
 
-cdef void object_set_item(perl.CV* p1, perl.CV* p2) with gil:
+cdef void object_set_item(perl.CV* p1, perl.CV* p2): # with gil:
     perl.stmt_dSP()
     perl.stmt_dMARK()
     perl.stmt_dAX()
@@ -156,7 +156,7 @@ cdef void object_set_item(perl.CV* p1, perl.CV* p2) with gil:
         exctype, value = sys.exc_info()[:2]
         perl.croak("%s", <char*>(value.message))
 
-cdef void object_del_item(perl.CV* p1, perl.CV* p2) with gil:
+cdef void object_del_item(perl.CV* p1, perl.CV* p2): # with gil:
     perl.stmt_dSP()
     perl.stmt_dMARK()
     perl.stmt_dAX()
@@ -185,7 +185,7 @@ cdef void object_del_item(perl.CV* p1, perl.CV* p2) with gil:
             perl.croak("Unhandled exception in object_del_item")
 
 
-cdef void object_length(perl.CV* p1, perl.CV* p2) with gil:
+cdef void object_length(perl.CV* p1, perl.CV* p2): # with gil:
     perl.stmt_dSP()
     perl.stmt_dMARK()
     perl.stmt_dAX()
@@ -212,7 +212,7 @@ cdef void object_length(perl.CV* p1, perl.CV* p2) with gil:
         else:
             perl.croak("Unhandled exception in object_length")
 
-cdef void object_is_mapping(perl.CV* p1, perl.CV* p2) with gil:
+cdef void object_is_mapping(perl.CV* p1, perl.CV* p2): # with gil:
     perl.stmt_dSP()
     perl.stmt_dMARK()
     perl.stmt_dAX()
