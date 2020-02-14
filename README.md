@@ -1,5 +1,9 @@
 PyPerler
 ========
+[![][travis-img]][travis-url]
+
+[travis-img]: https://travis-ci.org/tkluck/pyperler.svg?branch=master
+[travis-url]: https://travis-ci.org/tkluck/pyperler
 
 Quick introduction
 ------------------
