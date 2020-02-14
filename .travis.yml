@@ -11,7 +11,7 @@ python:
 install:
   - pip install -r requirements.txt
   - sudo apt-get install libperl-dev
-  - cpan install Text::Table
+  - cpan --quiet --installdeps --notest install Text::Table
 # command to run tests
 script:
   - make check
