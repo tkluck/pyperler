@@ -223,6 +223,14 @@ You can access class methods by calling them on the class:
 >>> Car.all_brands.list_context()
 ('Toyota', 'Nissan')
 
+Check that we report a proper error for non-existing packages:
+>>> Pkg = i.use('Non::Existing::Package') # doctest: +ELLIPSIS
+Traceback (most recent call last):
+...
+ImportError: Can't locate Non/Existing/Package.pm in @INC (you may need to install the Non::Existing::Package module) ...
+BEGIN failed--compilation aborted at ...
+<BLANKLINE>
+
 You can also pass Python functions as Perl callbacks:
 >>> def f(): return 3
 >>> i('sub callit { return $_[0]->() }');
@@ -716,10 +724,13 @@ cdef class PerlPackage:
         self._interpreter = interpreter
         self._interpreter._iterable_methods[name] = iterable_method
         self._name = name
+        failmessage = None
         try:
             interpreter('use ' + name)
         except RuntimeError as e:
-            raise ImportError("Could not import Perl package %s: %s" % (self._name, e.message))
+            failmessage = e.args[0]
+        if failmessage:
+            raise ImportError(failmessage, name=self._name)
 
     def __call__(self, *args, **kwds):
         cdef BoundMethod bound_method = BoundMethod()
