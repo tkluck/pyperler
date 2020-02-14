@@ -10,8 +10,8 @@ python:
 # command to install dependencies
 install:
   - pip install -r requirements.txt
-  - sudo apt-get install libperl-dev
-  - cpan --quiet --installdeps --notest install Text::Table
+  - sudo apt-get install libperl-dev cpanminus
+  - cpanm --notest Text::Table
 # command to run tests
 script:
   - make check
