@@ -11,7 +11,7 @@ python:
 install:
   - pip install -r requirements.txt
   - sudo apt-get install libperl-dev cpanminus
-  - sudo cpanm --notest Text::Table Class::Intspector
+  - sudo cpanm --notest Text::Table Class::Inspector
 # command to run tests
 script:
   - make check
