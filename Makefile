@@ -1,6 +1,6 @@
 all: pyperler
 
-PYTHON ?= python
+PYTHON ?= python3
 
 pyperler: pyperler.pyx perl.pxd setup.py
 	$(PYTHON) setup.py build
